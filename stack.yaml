@@ -7,8 +7,35 @@ resolver: lts-5.3
 # Local packages, usually specified by relative directory name
 packages:
 - '.'
+- location:
+    git: git@github.com:Teaspot-Studio/gore-and-ash-lambdacube.git
+    commit: 19494940f8366c2bff3a7d43aa0d1a9e8ded65ae
+- location:
+    git: git@github.com:lambdacube3d/lambdacube-gl.git
+    commit: 200517cace521fe9dd2195a497e14030b0303df5
+- location:
+    git: git@github.com:lambdacube3d/lambdacube-ir.git
+    commit: aa375a66800e577d928c92d7cd405a43ffdec728
+  subdirs:
+  - lambdacube-ir.haskell
+- location:
+    git: git@github.com:Teaspot-Studio/lambdacube-compiler.git
+    commit: 2c53caeba24d9f37acb05f3a0b30361ffd25dffa
+
 # Packages to be pulled from upstream that are not in the resolver (e.g., acme-missiles-0.3)
-extra-deps: []
+extra-deps:
+- aeson-0.10.0.0
+- async-2.0.2
+- base-orphans-0.5.1
+- gore-and-ash-1.1.0.1
+- gore-and-ash-glfw-1.1.0.0
+- indentation-0.2.1.1
+- indentation-0.2.1.1
+- pretty-compact-1.0
+- pretty-compact-1.0
+- QuickCheck-2.8.2
+- text-1.2.2.0
+- vect-0.4.7
 
 # Override default flag values for local packages and extra-deps
 flags: {}
