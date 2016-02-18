@@ -4,6 +4,16 @@ module Wireframe(
 
 import Common 
 
+-- | To prevent glitching at depth test
+bumpMat :: Mat 4 4 Float 
+bumpMat = M44F 
+  (V4 1.0 0.0 0.0 0.0)
+  (V4 0.0 1.0 0.0 0.0)
+  (V4 0.0 0.0 1.0 0.0)
+  (V4 d   d   d   1.0)
+  where
+    d = -0.001
+
 renderWireframe (modelMat :: Mat 4 4 Float)
                 (viewMat :: Mat 4 4 Float)
                 (projMat :: Mat 4 4 Float)
@@ -14,4 +24,4 @@ renderWireframe (modelMat :: Mat 4 4 Float)
   & rasterizePrimitives (TriangleCtx CullNone (PolygonLine 0.1) NoOffset LastVertex) Smooth
   & mapFragments ((\_ -> color) :: Normal -> Color)
   where
-    mvp = transpose $ modelMat .*. viewMat .*. projMat
+    mvp = transpose $ modelMat .*. viewMat .*. bumpMat .*. projMat
