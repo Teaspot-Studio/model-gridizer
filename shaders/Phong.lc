@@ -1,7 +1,6 @@
 type Position = Vec 3 Float 
 type PositionHomo = Vec 4 Float 
 type Normal = Vec 3 Float
-type UV = Vec 2 Float
 type Color = Vec 4 Float 
 type Direction = Vec 3 Float 
 
@@ -17,15 +16,14 @@ vec3 a = V3 a a a
 makeFrame (modelMat :: Mat 4 4 Float)
           (viewMat :: Mat 4 4 Float)
           (projMat :: Mat 4 4 Float)
-          (texture :: Texture)
           (lightPos :: Vec 3 Float) -- world space
-          (prims :: PrimitiveStream Triangle (Vec 3 Float, Vec 3 Float, Vec 2 Float))
+          (prims :: PrimitiveStream Triangle (Position, Normal))
 
     = imageFrame (emptyDepthImage 1, emptyColorImage (V4 0 0 0.4 1))
   `overlay`
       prims
     & mapPrimitives transform
-    & rasterizePrimitives (TriangleCtx CullNone PolygonFill NoOffset LastVertex) (Smooth, Smooth, Smooth, Smooth, Smooth)
+    & rasterizePrimitives (TriangleCtx CullNone PolygonFill NoOffset LastVertex) (Smooth, Smooth, Smooth, Smooth)
     & mapFragments enlight
     & accumulateWith (DepthOp Less True, ColorOp NoBlending (V4 True True True True))
   where
@@ -33,8 +31,8 @@ makeFrame (modelMat :: Mat 4 4 Float)
     mvp = transpose $ mv .*. projMat -- loaded matricies are in OpenGL format, need transpose
     viewmatInvT = inv mv
 
-    transform :: (Position, Normal, UV) -> (PositionHomo, Position, Normal, UV, Direction, Direction)
-    transform (p,n,uv) = (pproj, pworld, normalCamspace, uv, eyeDirCamspace, lightDirCamspace)
+    transform :: (Position, Normal) -> (PositionHomo, Position, Normal, Direction, Direction)
+    transform (p,n) = (pproj, pworld, normalCamspace, eyeDirCamspace, lightDirCamspace)
       where pproj = mvp *. homonize p
             pworld = unhomonize $ transpose modelMat *. homonize p
             pcam = unhomonize $ (transpose $ modelMat .*. viewMat) *. homonize p
@@ -43,11 +41,11 @@ makeFrame (modelMat :: Mat 4 4 Float)
             lightDirCamspace = lightPosCamspace + eyeDirCamspace
             normalCamspace = unhomonize $ viewmatInvT *. homonize n
 
-    enlight :: (Position, Normal, UV, Direction, Direction) -> Color
-    enlight (pworld, normalCamspace, uv, eyeDirCamspace, lightDir) = homonize colorLinear
+    enlight :: (Position, Normal, Direction, Direction) -> Color
+    enlight (pworld, normalCamspace, eyeDirCamspace, lightDir) = homonize colorLinear
       where 
-        diffuseColor = texture2D (Sampler PointFilter MirroredRepeat texture) uv
-        ambientColor = diffuseColor%xyz *! 0.1
+        diffuseColor = V3 0.6 0.6 0.6
+        ambientColor = diffuseColor *! 0.1
         specColor = V3 1 1 1
         shininess = 64.0
 
@@ -66,13 +64,12 @@ makeFrame (modelMat :: Mat 4 4 Float)
         cosAlpha = max 0 (min 1 $ e `dot` r) 
         specular = if lambertian <= 0 then 0 else pow cosAlpha shininess
 
-        colorLinear = ambientColor + diffuseColor%xyz *! (lambertian * lightFade) + specColor *! (specular * lightFade)
+        colorLinear = ambientColor + diffuseColor *! (lambertian * lightFade) + specColor *! (specular * lightFade)
 
 main :: Output
 main = renderFrame $
    makeFrame (Uniform "modelMat")
              (Uniform "viewMat")
              (Uniform "projMat")
-             (Texture2DSlot "diffuseTexture")
              (Uniform "lightPos")
-             (fetch_ "objects" (Attribute "position", Attribute "normal", Attribute "uv"))
+             (fetch_ "objects" (Attribute "position", Attribute "normal"))

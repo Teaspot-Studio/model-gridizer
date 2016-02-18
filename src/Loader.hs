@@ -1,25 +1,31 @@
 module Loader(
     cubeMesh
+  , loadObjMesh
   ) where
 
-import Prelude hiding ((.), id)
-
+import Control.Monad (join)
+import Control.Monad.IO.Class
 import qualified Data.Map as Map
 import qualified Data.Vector as V
 
---import Codec.Picture as Juicy
+import Codec.Wavefront
 import LambdaCube.GL as LambdaCubeGL -- renderer
 import LambdaCube.GL.Mesh as LambdaCubeGL
---import LambdaCube.Linear 
 
+loadObjMesh :: MonadIO m => FilePath -> m (Either String Mesh)
+loadObjMesh objFile = do 
+  eobj <- fromFile objFile
+  return . join $ parseObjMesh <$> eobj
+
+parseObjMesh :: WavefrontOBJ -> Either String Mesh 
+parseObjMesh = undefined
 
 -- geometry data: triangles
-cubeMesh :: LambdaCubeGL.Mesh
+cubeMesh :: Mesh
 cubeMesh = Mesh
   { mAttributes   = Map.fromList
       [ ("position",  A_V3F $ V.fromList vertecies)
       , ("normal",    A_V3F $ V.fromList normals)
-      , ("uv",        A_V2F $ V.fromList uvs)
       ]
   , mPrimitive    = P_Triangles
   }
@@ -40,7 +46,6 @@ cubeMesh = Mesh
     , replicate 6 n4
     , replicate 6 n5
     ]
-  uvs = concat $ replicate 6 [u1, u2, u3, u1, u3, u0]
 
   v0 = V3 (-1) (-1) (-1)
   v1 = V3 (-1)   1  (-1)
@@ -57,8 +62,3 @@ cubeMesh = Mesh
   n3 = V3   1    0    0 
   n4 = V3   0    1    0
   n5 = V3   0  (-1)   0
-
-  u0 = V2 0 0 
-  u1 = V2 1 0 
-  u2 = V2 1 1 
-  u3 = V2 0 1
