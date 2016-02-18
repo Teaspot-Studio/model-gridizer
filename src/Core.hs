@@ -37,3 +37,17 @@ instance GameModule AppMonad AppState where
 
 -- | Arrow that is build over the monad stack
 type AppWire a b = GameWire AppMonad a b
+
+-- | Helper to run initalization step for wire
+-- TODO: move to core package
+withInit :: (c -> GameMonadT AppMonad a) -> (a -> AppWire c b) -> AppWire c b 
+withInit initStep nextStep = mkGen $ \s c -> do 
+  a <- initStep c
+  (mb, nextStep') <- stepWire (nextStep a) s (Right c)
+  return (mb, nextStep')
+
+-- | Inhibits if gets Nothing
+nothingInhibit :: AppWire (Maybe a) a 
+nothingInhibit = mkPure_ $ \ma -> case ma of 
+  Nothing -> Left ()
+  Just a -> Right a
