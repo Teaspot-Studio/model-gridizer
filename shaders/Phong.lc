@@ -1,23 +1,14 @@
-type Position = Vec 3 Float 
-type PositionHomo = Vec 4 Float 
-type Normal = Vec 3 Float
-type Color = Vec 4 Float 
-type Direction = Vec 3 Float 
+module Phong(
+    renderPhong
+  ) where
 
-homonize :: Vec 3 Float -> Vec 4 Float 
-homonize v = V4 v%x v%y v%z 1 
+import Common
 
-unhomonize :: Vec 4 Float -> Vec 3 Float 
-unhomonize v = V3 (v%x / v%w) (v%y / v%w) (v%z / v%w)
-
-vec3 :: Float -> Vec 3 Float 
-vec3 a = V3 a a a 
-
-makeFrame (modelMat :: Mat 4 4 Float)
-          (viewMat :: Mat 4 4 Float)
-          (projMat :: Mat 4 4 Float)
-          (lightPos :: Vec 3 Float) -- world space
-          (prims :: PrimitiveStream Triangle (Position, Normal))
+renderPhong (modelMat :: Mat 4 4 Float)
+            (viewMat :: Mat 4 4 Float)
+            (projMat :: Mat 4 4 Float)
+            (lightPos :: Vec 3 Float) -- world space
+            (prims :: PrimitiveStream Triangle (Position, Normal))
 
     = imageFrame (emptyDepthImage 1, emptyColorImage (V4 0 0 0.4 1))
   `overlay`
@@ -65,11 +56,3 @@ makeFrame (modelMat :: Mat 4 4 Float)
         specular = if lambertian <= 0 then 0 else pow cosAlpha shininess
 
         colorLinear = ambientColor + diffuseColor *! (lambertian * lightFade) + specColor *! (specular * lightFade)
-
-main :: Output
-main = renderFrame $
-   makeFrame (Uniform "modelMat")
-             (Uniform "viewMat")
-             (Uniform "projMat")
-             (Uniform "lightPos")
-             (fetch_ "objects" (Attribute "position", Attribute "normal"))

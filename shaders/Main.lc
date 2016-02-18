@@ -1,0 +1,9 @@
+import Phong
+
+main :: Output
+main = renderFrame $
+   renderPhong (Uniform "modelMat")
+               (Uniform "viewMat")
+               (Uniform "projMat")
+               (Uniform "lightPos")
+               (fetch_ "objects" (Attribute "position", Attribute "normal"))

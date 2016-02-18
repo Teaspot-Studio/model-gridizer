@@ -1,0 +1,16 @@
+module Common where
+
+type Position = Vec 3 Float 
+type PositionHomo = Vec 4 Float 
+type Normal = Vec 3 Float
+type Color = Vec 4 Float 
+type Direction = Vec 3 Float 
+
+homonize :: Vec 3 Float -> Vec 4 Float 
+homonize v = V4 v%x v%y v%z 1 
+
+unhomonize :: Vec 4 Float -> Vec 3 Float 
+unhomonize v = V3 (v%x / v%w) (v%y / v%w) (v%z / v%w)
+
+vec3 :: Float -> Vec 3 Float 
+vec3 a = V3 a a a 

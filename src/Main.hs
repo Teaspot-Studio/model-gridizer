@@ -38,7 +38,7 @@ main = withModule (Proxy :: Proxy AppMonad) $ do
       (_, gs') <- stepGame gs $ do
         win <- liftIO $ initWindow "Model gridizer" 1024 1080
         setCurrentWindowM $ Just win 
-        lambdacubeAddPipeline [".", "./shaders"] "Phong.lc" mainPipeline $ do
+        lambdacubeAddPipeline [".", "./shaders"] "Main.lc" mainPipeline $ do
           defObjectArray "objects" Triangles $ do
             "position"  @: Attribute_V3F
             "normal"    @: Attribute_V3F
