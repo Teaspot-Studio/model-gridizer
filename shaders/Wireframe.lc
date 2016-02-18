@@ -1,0 +1,17 @@
+module Wireframe(
+    renderWireframe
+  ) where
+
+import Common 
+
+renderWireframe (modelMat :: Mat 4 4 Float)
+                (viewMat :: Mat 4 4 Float)
+                (projMat :: Mat 4 4 Float)
+                (color :: Color)
+                (prims :: PrimitiveStream Triangle (Position, Normal))
+  = prims
+  & mapPrimitives (\(p, n) -> (mvp *. homonize p, n))
+  & rasterizePrimitives (TriangleCtx CullNone (PolygonLine 0.1) NoOffset LastVertex) Smooth
+  & mapFragments ((\_ -> color) :: Normal -> Color)
+  where
+    mvp = transpose $ modelMat .*. viewMat .*. projMat

@@ -10,13 +10,10 @@ renderPhong (modelMat :: Mat 4 4 Float)
             (lightPos :: Vec 3 Float) -- world space
             (prims :: PrimitiveStream Triangle (Position, Normal))
 
-    = imageFrame (emptyDepthImage 1, emptyColorImage (V4 0 0 0.4 1))
-  `overlay`
-      prims
+    = prims
     & mapPrimitives transform
     & rasterizePrimitives (TriangleCtx CullNone PolygonFill NoOffset LastVertex) (Smooth, Smooth, Smooth, Smooth)
     & mapFragments enlight
-    & accumulateWith (DepthOp Less True, ColorOp NoBlending (V4 True True True True))
   where
     mv = modelMat .*. viewMat
     mvp = transpose $ mv .*. projMat -- loaded matricies are in OpenGL format, need transpose
