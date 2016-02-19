@@ -31,7 +31,8 @@ mainPipeline = "mainPipeline"
 
 main :: IO ()
 main = withModule (Proxy :: Proxy AppMonad) $ do
-  gs <- newGameState mainWire
+  let gridSize = 1
+  gs <- newGameState $ mainWire gridSize
   firstLoop gs `catch` errorExit
   where 
     firstLoop gs = do 
@@ -46,8 +47,8 @@ main = withModule (Proxy :: Proxy AppMonad) $ do
             "modelMat"       @: M44F
             "viewMat"        @: M44F
             "projMat"        @: M44F
-            "diffuseTexture" @: FTexture2D
             "lightPos"       @: V3F
+            "wireOnly"       @: Bool
 
         return ()
       gameLoop gs'
@@ -88,26 +89,27 @@ data Game = Game {
 
 instance NFData Game 
 
-mainWire :: AppWire a (Maybe Game)
-mainWire = withInit (const initStorage) (uncurry renderWire)
+mainWire :: Float ->  AppWire a (Maybe Game)
+mainWire gridSize = withInit (const initStorage) (renderWire gridSize)
 
 -- | Initalizes storage and then switches to rendering state
 initStorage :: GameMonadT AppMonad (GLStorage, GPUMesh)
 initStorage = do 
   (sid, storage) <- lambdacubeCreateStorage mainPipeline
   gpuMesh <- liftIO $ LambdaCubeGL.uploadMeshToGPU cubeMesh
-  lambdacubeRenderStorageFirst sid
+  lambdacubeRenderStorageLast sid
   return (storage, gpuMesh)
 
 -- | Infinitely render given storage
-renderWire :: GLStorage -> GPUMesh -> AppWire a (Maybe Game)
-renderWire storage gpuMesh = (<|> pure Nothing) $ proc _ -> do
+renderWire :: Float -> (GLStorage, GPUMesh) -> AppWire a (Maybe Game)
+renderWire gridSize (storage, gpuMesh) = (<|> pure Nothing) $ proc _ -> do
   w <- nothingInhibit . liftGameMonad getCurrentWindowM -< ()
   closed <- isWindowClosed -< ()
   aspect <- updateWinSize -< w
   t <- timeF -< ()
   globalUniforms -< (aspect, t)
   cube storage gpuMesh -< ()
+  grid storage gpuMesh gridSize -< ()
   glfwFinishFrame -< w
   returnA -< Just $ Game closed
   where
@@ -142,10 +144,28 @@ cube storage gpuMesh = withInit (const initCube) renderCube
   initCube = do 
     -- upload geometry to GPU and add to pipeline input
     liftIO $
-      LambdaCubeGL.addMeshToObjectArray storage "objects" ["modelMat"] gpuMesh
+      LambdaCubeGL.addMeshToObjectArray storage "objects" ["modelMat", "wireOnly"] gpuMesh
 
   -- | Update object specific uniforms
   renderCube :: Object -> AppWire a ()
   renderCube obj = (timeF >>>) $ liftGameMonad1 $ \t -> liftIO $ do 
     let setter = LambdaCubeGL.objectUniformSetter obj
     uniformM44F "modelMat" setter $ modelMatrix t
+    uniformBool "wireOnly" setter False
+
+-- | Intializes and renders grid
+grid :: GLStorage -> GPUMesh -> Float -> AppWire a ()
+grid storage gpuMesh _ = withInit (const initGrid) renderGrid
+  where
+  initGrid :: GameMonadT AppMonad Object
+  initGrid = do 
+    -- upload geometry to GPU and add to pipeline input
+    liftIO $
+      LambdaCubeGL.addMeshToObjectArray storage "objects" ["modelMat", "wireOnly"] gpuMesh
+
+  -- | Update object specific uniforms
+  renderGrid :: Object -> AppWire a ()
+  renderGrid obj = (timeF >>>) $ liftGameMonad1 $ \t -> liftIO $ do 
+    let setter = LambdaCubeGL.objectUniformSetter obj
+    uniformM44F "modelMat" setter $ modelMatrix t
+    uniformBool "wireOnly" setter True

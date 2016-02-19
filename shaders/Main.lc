@@ -4,16 +4,16 @@ import Wireframe
 main :: Output
 main = let 
   clear = imageFrame (emptyDepthImage 1, emptyColorImage (V4 0 0 0.4 1))
-  phong = renderPhong modelMat viewMat projMat lightPos prims
+  phong = renderPhong wireOnly modelMat viewMat projMat lightPos prims
   wires = renderWireframe modelMat viewMat projMat (V4 1 0 0 1) prims
-  in renderFrame (
-              clear 
-    `overlay` accum phong
-    `overlay` accum wires)
+  fullRender = clear `overlay` accum phong `overlay` accum wires
+  in renderFrame fullRender
   where
+    wireOnly = Uniform "wireOnly"
     modelMat = Uniform "modelMat"
     viewMat = Uniform "viewMat"
     projMat = Uniform "projMat"
     lightPos = Uniform "lightPos"
     prims = fetch_ "objects" (Attribute "position", Attribute "normal")
-    accum = accumulateWith (DepthOp Less True, ColorOp NoBlending (V4 True True True True))
+    blending = Blend (FuncAdd, FuncAdd) ((SrcAlpha, OneMinusSrcAlpha), (SrcAlpha, OneMinusSrcAlpha)) (V4 1 1 1 1)
+    accum = accumulateWith (DepthOp Less True, ColorOp blending (V4 True True True True))

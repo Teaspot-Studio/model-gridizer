@@ -4,7 +4,8 @@ module Phong(
 
 import Common
 
-renderPhong (modelMat :: Mat 4 4 Float)
+renderPhong (skip :: Bool)
+            (modelMat :: Mat 4 4 Float)
             (viewMat :: Mat 4 4 Float)
             (projMat :: Mat 4 4 Float)
             (lightPos :: Vec 3 Float) -- world space
@@ -12,7 +13,7 @@ renderPhong (modelMat :: Mat 4 4 Float)
 
     = prims
     & mapPrimitives transform
-    & rasterizePrimitives (TriangleCtx CullNone PolygonFill NoOffset LastVertex) (Smooth, Smooth, Smooth, Smooth)
+    & rasterizePrimitives (TriangleCtx CullFront PolygonFill NoOffset LastVertex) (Smooth, Smooth, Smooth, Smooth)
     & mapFragments enlight
   where
     mv = modelMat .*. viewMat
@@ -21,7 +22,7 @@ renderPhong (modelMat :: Mat 4 4 Float)
 
     transform :: (Position, Normal) -> (PositionHomo, Position, Normal, Direction, Direction)
     transform (p,n) = (pproj, pworld, normalCamspace, eyeDirCamspace, lightDirCamspace)
-      where pproj = mvp *. homonize p
+      where pproj = mvp *. homonize (if skip then p *! 0 else p)
             pworld = unhomonize $ transpose modelMat *. homonize p
             pcam = unhomonize $ (transpose $ modelMat .*. viewMat) *. homonize p
             eyeDirCamspace = pcam *! (-1)
@@ -30,7 +31,8 @@ renderPhong (modelMat :: Mat 4 4 Float)
             normalCamspace = unhomonize $ viewmatInvT *. homonize n
 
     enlight :: (Position, Normal, Direction, Direction) -> Color
-    enlight (pworld, normalCamspace, eyeDirCamspace, lightDir) = homonize colorLinear
+    enlight (pworld, normalCamspace, eyeDirCamspace, lightDir) = 
+      if skip then V4 0 0 0 0 else homonize colorLinear
       where 
         diffuseColor = V3 0.6 0.6 0.6
         ambientColor = diffuseColor *! 0.1
