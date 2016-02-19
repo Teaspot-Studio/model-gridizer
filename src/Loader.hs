@@ -1,5 +1,6 @@
 module Loader(
     cubeMesh
+  , gridMesh
   , loadObjMesh
   ) where
 
@@ -19,6 +20,18 @@ loadObjMesh objFile = do
 
 parseObjMesh :: WavefrontOBJ -> Either String Mesh 
 parseObjMesh = undefined
+
+gridMesh :: Float -> Mesh 
+gridMesh _ = Mesh {
+    mAttributes = Map.fromList 
+      [ ("position", A_V3F $ V.fromList vertecies)
+      , ("normal",   A_V3F $ V.fromList normals)
+      ]
+  , mPrimitive = P_Triangles
+  }
+  where
+  vertecies = []
+  normals = []
 
 -- geometry data: triangles
 cubeMesh :: Mesh
