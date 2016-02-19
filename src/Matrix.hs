@@ -2,6 +2,7 @@ module Matrix(
     modelMatrix
   , cameraMatrix
   , projMatrix
+  , gridModelMatrix
   ) where
 
 import Linear
@@ -16,6 +17,10 @@ convLC (V4 !a !b !c !d) =  LC.V4 (cv a) (cv b) (cv c) (cv d)
 -- | Model matrix, maps from local model coords to world coords
 modelMatrix :: Float -> LC.M44F 
 modelMatrix t = convLC . quatMatrix $ axisAngle (normalize $ V3 1 1 3) t 
+
+-- | Grid is static
+gridModelMatrix :: LC.M44F 
+gridModelMatrix = convLC identity
 
 -- | Camera matrix, maps from world coords to camera coords
 cameraMatrix :: Float -> LC.M44F 

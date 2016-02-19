@@ -162,7 +162,7 @@ grid storage size = withInit (const initGrid) renderGrid
 
   -- | Update object specific uniforms
   renderGrid :: Object -> AppWire a ()
-  renderGrid obj = (timeF >>>) $ liftGameMonad1 $ \t -> liftIO $ do 
+  renderGrid obj = liftGameMonad $ liftIO $ do 
     let setter = LambdaCubeGL.objectUniformSetter obj
-    uniformM44F "modelMat" setter $ modelMatrix t
+    uniformM44F "modelMat" setter gridModelMatrix
     uniformBool "wireOnly" setter True

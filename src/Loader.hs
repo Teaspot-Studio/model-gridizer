@@ -8,6 +8,7 @@ import Control.Monad (join)
 import Control.Monad.IO.Class
 import qualified Data.Map as Map
 import qualified Data.Vector as V
+import Data.Monoid 
 
 import Codec.Wavefront
 import LambdaCube.GL as LambdaCubeGL -- renderer
@@ -22,16 +23,30 @@ parseObjMesh :: WavefrontOBJ -> Either String Mesh
 parseObjMesh = undefined
 
 gridMesh :: Float -> Mesh 
-gridMesh _ = Mesh {
+gridMesh s = Mesh {
     mAttributes = Map.fromList 
-      [ ("position", A_V3F $ V.fromList vertecies)
-      , ("normal",   A_V3F $ V.fromList normals)
+      [ ("position", A_V3F $ vertecies)
+      , ("normal",   A_V3F $ normals)
       ]
   , mPrimitive = P_Triangles
   }
   where
-  vertecies = []
-  normals = []
+  d = fromIntegral n
+  n = 5
+  vertecies = planes <> zlines
+  normals = V.replicate (length vertecies) (V3 1 0 0)
+
+  planes = V.foldl' (\acc z -> acc <> ylines z <> xlines z) V.empty (V.fromList [-n .. n])
+  ylines z = V.foldl' (\acc x -> acc <> yline (fromIntegral z) (fromIntegral x)) V.empty (V.fromList [-n .. n])
+  xlines z = V.foldl' (\acc y -> acc <> xline (fromIntegral z) (fromIntegral y)) V.empty (V.fromList [-n .. n])
+  zlines = foldl2D n n $ \acc x y -> acc <> zline (fromIntegral x) (fromIntegral y)
+
+  yline z x = V.fromList [V3 (s*x) (-d) (s*z), V3 (s*x) d (s*z), V3 (s*x) d (s*z)]
+  xline z y = V.fromList [V3 (-d) (s*y) (s*z), V3 d (s*y) (s*z), V3 d (s*y) (s*z)]
+  zline x y = V.fromList [V3 (s*x) (s*y) (-d), V3 (s*x) (s*y) d, V3 (s*x) (s*y) d]
+
+  foldl2D :: Int -> Int -> (V.Vector a -> Int -> Int -> V.Vector a) -> V.Vector a
+  foldl2D nx ny f = V.foldl' (\accx x -> V.foldl' (\accy y -> f accy x y) accx (V.fromList [-ny .. ny])) V.empty (V.fromList [-nx .. nx])
 
 -- geometry data: triangles
 cubeMesh :: Mesh
