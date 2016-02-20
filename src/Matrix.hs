@@ -9,6 +9,8 @@ import Linear
 import qualified LambdaCube.Linear as LC 
 import Game.GoreAndAsh.Math
 
+import Camera 
+
 -- | Convert from linear matrix format to LambdaCube format
 convLC :: M44 Float -> LC.M44F 
 convLC (V4 !a !b !c !d) =  LC.V4 (cv a) (cv b) (cv c) (cv d)
@@ -20,16 +22,12 @@ modelMatrix :: Float -> LC.M44F
 modelMatrix t = convLC . quatMatrix $ axisAngle (normalize $ V3 1 1 3) t 
 
 -- | Grid is static
-gridModelMatrix :: Float -> Float -> LC.M44F 
-gridModelMatrix gridSize t = convLC $ translate (fromIntegral . (round :: Float -> Int) . (/ gridSize) <$> cameraEye t)
+gridModelMatrix :: Camera -> Float -> LC.M44F 
+gridModelMatrix Camera{..} gridSize = convLC $ translate (fromIntegral . (round :: Float -> Int) . (/ gridSize) <$> cameraEye)
 
 -- | Camera matrix, maps from world coords to camera coords
-cameraMatrix :: Float -> LC.M44F 
-cameraMatrix t = convLC $ lookAt (cameraEye t) (V3 0 0 0) (V3 0 1 0)
-
--- | Dynamic position of camera eye
-cameraEye :: Float -> V3 Float
-cameraEye t = rotate (axisAngle (V3 0 1 0) (t/5)) (V3 8 2 8)
+cameraMatrix :: Camera -> LC.M44F 
+cameraMatrix Camera{..} = convLC $ lookAt cameraEye (cameraEye + cameraForward) cameraUp
 
 -- | Projection matrix, maps from camera coords to device normalized coords
 projMatrix :: Float -> LC.M44F 

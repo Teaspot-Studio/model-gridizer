@@ -19,6 +19,7 @@ executable model-gridizer
   other-modules:       Core
                        Matrix
                        Loader
+                       Camera
   build-depends:       base >= 4.7 && < 5
                      , containers >= 0.5.6.2
                      , deepseq >= 1.4.1.1

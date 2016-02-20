@@ -19,12 +19,15 @@ import Game.GoreAndAsh.GLFW
 import Core 
 import Matrix
 import Loader
+import Camera 
 
 import qualified Graphics.UI.GLFW as GLFW 
 
 import LambdaCube.GL as LambdaCubeGL -- renderer
 import LambdaCube.GL.Mesh as LambdaCubeGL
 import LambdaCube.Linear 
+
+import qualified Linear as L 
 
 mainPipeline :: PipelineId 
 mainPipeline = "mainPipeline"
@@ -107,8 +110,9 @@ renderWire gridSize storage = (<|> pure Nothing) $ proc _ -> do
   aspect <- updateWinSize -< w
   t <- timeF -< ()
   globalUniforms -< (aspect, t)
+  cam <- camera storage -< ()
   cube storage -< ()
-  grid storage gridSize -< ()
+  grid storage gridSize -< cam
   glfwFinishFrame -< w
   returnA -< Just $ Game closed
   where
@@ -125,9 +129,8 @@ renderWire gridSize storage = (<|> pure Nothing) $ proc _ -> do
 
   -- | Updates storage uniforms
   globalUniforms :: AppWire (Float, Float) ()
-  globalUniforms = liftGameMonad1 $ \(aspect, t) -> liftIO $ 
+  globalUniforms = liftGameMonad1 $ \(aspect, _) -> liftIO $ 
     LambdaCubeGL.updateUniforms storage $ do
-      "viewMat" @= return (cameraMatrix t)
       "projMat" @= return (projMatrix aspect)
       "lightPos" @= return (V3 3 3 3 :: V3F)
 
@@ -152,7 +155,7 @@ cube storage = withInit (const initCube) renderCube
     uniformBool "wireOnly" setter False
 
 -- | Intializes and renders grid
-grid :: GLStorage -> Float -> AppWire a ()
+grid :: GLStorage -> Float -> AppWire Camera ()
 grid storage size = withInit (const initGrid) renderGrid
   where
   initGrid :: GameMonadT AppMonad Object
@@ -161,8 +164,20 @@ grid storage size = withInit (const initGrid) renderGrid
     LambdaCubeGL.addMeshToObjectArray storage "objects" ["modelMat", "wireOnly"] gpuMesh
 
   -- | Update object specific uniforms
-  renderGrid :: Object -> AppWire a ()
-  renderGrid obj = (timeF >>>) $ liftGameMonad1 $ \t -> liftIO $ do 
+  renderGrid :: Object -> AppWire Camera ()
+  renderGrid obj = liftGameMonad1 $ \cam -> liftIO $ do 
     let setter = LambdaCubeGL.objectUniformSetter obj
-    uniformM44F "modelMat" setter $ gridModelMatrix size t
+    uniformM44F "modelMat" setter $ gridModelMatrix cam size
     uniformBool "wireOnly" setter True
+
+-- | Camera control
+camera :: GLStorage -> AppWire a Camera
+camera storage = proc _ -> do 
+  updUniforms -< initalCamera
+  returnA -< initalCamera
+  where
+    initalCamera = Camera (L.V3 0 1 0) (L.normalize $ L.V3 (-5) (-2) (-5)) (L.V3 5 2 5)
+
+    updUniforms = liftGameMonad1 $ \cam -> liftIO $ do
+      LambdaCubeGL.updateUniforms storage $ do
+        "viewMat" @= return (cameraMatrix cam)
