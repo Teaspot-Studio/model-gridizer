@@ -32,7 +32,7 @@ gridMesh s = Mesh {
   }
   where
   d = fromIntegral n
-  n = 5
+  n = 3
   vertecies = planes <> zlines
   normals = V.replicate (length vertecies) (V3 1 0 0)
 
