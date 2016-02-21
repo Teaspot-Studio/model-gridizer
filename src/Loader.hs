@@ -28,8 +28,8 @@ parseObjMesh WavefrontOBJ{..} = mkMesh <$> F.foldlM accumFaces (V.empty, V.empty
     mkMesh :: VecNormAccum -> Mesh
     mkMesh (vs, ns) = Mesh {
       mAttributes = Map.fromList 
-        [ ("position", A_V3F vs)
-        , ("normal",   A_V3F ns)
+        [ ("position", A_V3F $ V.reverse vs)
+        , ("normal",   A_V3F $ V.reverse ns)
         ]
       , mPrimitive = P_Triangles
       }
@@ -46,13 +46,13 @@ parseObjMesh WavefrontOBJ{..} = mkMesh <$> F.foldlM accumFaces (V.empty, V.empty
       (v3, n3) <- mkVert f3 
       return (V.fromList [v1, v2, v3], V.fromList [n1, n2, n3])
     mkFace _ = Left "Converter support only triangles, triangulate your OBJ file"
-    
+
     mkVert :: FaceIndex -> Either String (V3 Float, V3 Float)
     mkVert FaceIndex{..} = case faceNorIndex of 
       Nothing -> Left "OBJ model must have normals for each vertex"
-      Just ni -> case objLocations V.!? faceLocIndex of 
+      Just ni -> case objLocations V.!? (faceLocIndex - 1) of 
         Nothing -> Left $ "Cannot find vertex with id " ++ show faceLocIndex 
-        Just (Location lx ly lz _) -> case objNormals V.!? ni of
+        Just (Location lx ly lz _) -> case objNormals V.!? (ni - 1) of
           Nothing -> Left $ "Cannot find normal with id " ++ show ni 
           Just (Normal nx ny nz) -> Right (V3 lx ly lz, V3 nx ny nz)
 

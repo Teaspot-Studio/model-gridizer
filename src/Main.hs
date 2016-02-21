@@ -8,6 +8,8 @@ import Control.Monad.Catch (catch)
 import Control.Monad.IO.Class
 import Data.Maybe (fromMaybe)
 import Data.Proxy
+import System.Environment
+import Text.Read
 
 import Control.Wire 
 import Prelude hiding ((.), id)
@@ -34,10 +36,18 @@ mainPipeline = "mainPipeline"
 
 main :: IO ()
 main = withModule (Proxy :: Proxy AppMonad) $ do
-  let gridSize = 1
-  gs <- newGameState $ mainWire gridSize
+  (gridSize, objMeshName) <- parseArgs
+  gs <- newGameState $ mainWire gridSize objMeshName
   firstLoop gs `catch` errorExit
   where 
+    parseArgs = do 
+      args <- getArgs 
+      case args of 
+        [a, b] -> case readMaybe a of 
+          Nothing -> fail "Failed to parse grid size, not float"
+          Just gridSize -> return (gridSize, b)
+        _ -> fail "Expected two input arguments: grid size (float) and OBJ model path"
+
     firstLoop gs = do 
       (_, gs') <- stepGame gs $ do
         win <- liftIO $ initWindow "Model gridizer" 1024 1080
@@ -92,8 +102,8 @@ data Game = Game {
 
 instance NFData Game 
 
-mainWire :: Float ->  AppWire a (Maybe Game)
-mainWire gridSize = withInit (const initStorage) (renderWire gridSize)
+mainWire :: Float -> FilePath -> AppWire a (Maybe Game)
+mainWire gridSize objMeshName = withInit (const initStorage) (renderWire gridSize objMeshName)
 
 -- | Initalizes storage and then switches to rendering state
 initStorage :: GameMonadT AppMonad GLStorage
@@ -103,15 +113,15 @@ initStorage = do
   return storage
 
 -- | Infinitely render given storage
-renderWire :: Float -> GLStorage -> AppWire a (Maybe Game)
-renderWire gridSize storage = (<|> pure Nothing) $ proc _ -> do
+renderWire :: Float -> FilePath -> GLStorage -> AppWire a (Maybe Game)
+renderWire gridSize objMeshName storage = (<|> pure Nothing) $ proc _ -> do
   w <- nothingInhibit . liftGameMonad getCurrentWindowM -< ()
   closed <- isWindowClosed -< ()
   aspect <- updateWinSize -< w
   t <- timeF -< ()
   globalUniforms -< (aspect, t)
   cam <- camera storage -< ()
-  cube storage -< ()
+  model storage objMeshName -< ()
   grid storage gridSize -< cam
   glfwFinishFrame -< w
   returnA -< Just $ Game closed
@@ -138,18 +148,22 @@ renderWire gridSize storage = (<|> pure Nothing) $ proc _ -> do
   glfwFinishFrame :: AppWire GLFW.Window ()
   glfwFinishFrame = liftGameMonad1 $ liftIO . GLFW.swapBuffers
 
--- | Intializes and renders cube
-cube :: GLStorage -> AppWire a ()
-cube storage = withInit (const initCube) renderCube
+-- | Intializes and renders obj mesh
+model :: GLStorage -> FilePath -> AppWire a ()
+model storage objMeshName = withInit (const initModel) renderModel
   where
-  initCube :: GameMonadT AppMonad Object
-  initCube = liftIO $ do 
-    gpuMesh <- liftIO $ LambdaCubeGL.uploadMeshToGPU cubeMesh
-    LambdaCubeGL.addMeshToObjectArray storage "objects" ["modelMat", "wireOnly"] gpuMesh
+  initModel :: GameMonadT AppMonad Object
+  initModel = liftIO $ do 
+    mmesh <- loadObjMesh objMeshName
+    case mmesh of 
+      Left er -> fail er 
+      Right modelMesh -> do 
+        gpuMesh <- liftIO $ LambdaCubeGL.uploadMeshToGPU modelMesh
+        LambdaCubeGL.addMeshToObjectArray storage "objects" ["modelMat", "wireOnly"] gpuMesh
     
   -- | Update object specific uniforms
-  renderCube :: Object -> AppWire a ()
-  renderCube obj = (timeF >>>) $ liftGameMonad1 $ \t -> liftIO $ do 
+  renderModel :: Object -> AppWire a ()
+  renderModel obj = (timeF >>>) $ liftGameMonad1 $ \t -> liftIO $ do 
     let setter = LambdaCubeGL.objectUniformSetter obj
     uniformM44F "modelMat" setter $ modelMatrix t
     uniformBool "wireOnly" setter False
