@@ -62,6 +62,7 @@ main = withModule (Proxy :: Proxy AppMonad) $ do
             "projMat"        @: M44F
             "lightPos"       @: V3F
             "wireOnly"       @: Bool
+            "gridColor"      @: V4F
 
         return ()
       gameLoop gs'
@@ -159,7 +160,7 @@ model storage objMeshName = withInit (const initModel) renderModel
       Left er -> fail er 
       Right modelMesh -> do 
         gpuMesh <- liftIO $ LambdaCubeGL.uploadMeshToGPU modelMesh
-        LambdaCubeGL.addMeshToObjectArray storage "objects" ["modelMat", "wireOnly"] gpuMesh
+        LambdaCubeGL.addMeshToObjectArray storage "objects" ["modelMat", "wireOnly", "gridColor"] gpuMesh
     
   -- | Update object specific uniforms
   renderModel :: Object -> AppWire a ()
@@ -167,6 +168,7 @@ model storage objMeshName = withInit (const initModel) renderModel
     let setter = LambdaCubeGL.objectUniformSetter obj
     uniformM44F "modelMat" setter $ modelMatrix t
     uniformBool "wireOnly" setter False
+    uniformV4F "gridColor" setter $ V4 0.1 0.1 0.1 1
 
 -- | Intializes and renders grid
 grid :: GLStorage -> Float -> AppWire Camera ()
@@ -175,7 +177,7 @@ grid storage size = withInit (const initGrid) renderGrid
   initGrid :: GameMonadT AppMonad Object
   initGrid = liftIO $ do 
     gpuMesh <- liftIO $ LambdaCubeGL.uploadMeshToGPU $ gridMesh size
-    LambdaCubeGL.addMeshToObjectArray storage "objects" ["modelMat", "wireOnly"] gpuMesh
+    LambdaCubeGL.addMeshToObjectArray storage "objects" ["modelMat", "wireOnly", "gridColor"] gpuMesh
 
   -- | Update object specific uniforms
   renderGrid :: Object -> AppWire Camera ()
@@ -183,6 +185,7 @@ grid storage size = withInit (const initGrid) renderGrid
     let setter = LambdaCubeGL.objectUniformSetter obj
     uniformM44F "modelMat" setter $ gridModelMatrix cam size
     uniformBool "wireOnly" setter True
+    uniformV4F "gridColor" setter $ V4 1.0 0.3 0.3 1
 
 -- | Camera control
 camera :: GLStorage -> AppWire a Camera

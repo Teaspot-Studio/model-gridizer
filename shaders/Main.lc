@@ -5,7 +5,7 @@ main :: Output
 main = let 
   clear = imageFrame (emptyDepthImage 1, emptyColorImage (V4 0 0 0.4 1))
   phong = renderPhong wireOnly modelMat viewMat projMat lightPos prims
-  wires = renderWireframe modelMat viewMat projMat (V4 1 0 0 1) prims
+  wires = renderWireframe modelMat viewMat projMat gridColor prims
   fullRender = clear `overlay` accum phong `overlay` accum wires
   in renderFrame fullRender
   where
@@ -17,3 +17,4 @@ main = let
     prims = fetch_ "objects" (Attribute "position", Attribute "normal")
     blending = Blend (FuncAdd, FuncAdd) ((SrcAlpha, OneMinusSrcAlpha), (SrcAlpha, OneMinusSrcAlpha)) (V4 1 1 1 1)
     accum = accumulateWith (DepthOp Less True, ColorOp blending (V4 True True True True))
+    gridColor = Uniform "gridColor"
