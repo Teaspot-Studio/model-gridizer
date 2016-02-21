@@ -8,6 +8,7 @@ import Control.Monad (join)
 import Control.Monad.IO.Class
 import qualified Data.Map as Map
 import qualified Data.Vector as V
+import qualified Data.Foldable as F 
 import Data.Monoid 
 
 import Codec.Wavefront
@@ -19,8 +20,41 @@ loadObjMesh objFile = do
   eobj <- fromFile objFile
   return . join $ parseObjMesh <$> eobj
 
+type VecNormAccum = (V.Vector (V3 Float), V.Vector (V3 Float))
+
 parseObjMesh :: WavefrontOBJ -> Either String Mesh 
-parseObjMesh = undefined
+parseObjMesh WavefrontOBJ{..} = mkMesh <$> F.foldlM accumFaces (V.empty, V.empty) objFaces 
+  where
+    mkMesh :: VecNormAccum -> Mesh
+    mkMesh (vs, ns) = Mesh {
+      mAttributes = Map.fromList 
+        [ ("position", A_V3F vs)
+        , ("normal",   A_V3F ns)
+        ]
+      , mPrimitive = P_Triangles
+      }
+
+    accumFaces :: VecNormAccum -> Element Face -> Either String VecNormAccum
+    accumFaces (vs, ns) f = do
+      (vs', ns') <- mkFace . elValue $ f
+      return $ (vs <> vs', ns <> ns')
+
+    mkFace :: Face -> Either String (V.Vector (V3 Float), V.Vector (V3 Float))
+    mkFace (Triangle f1 f2 f3) = do
+      (v1, n1) <- mkVert f1 
+      (v2, n2) <- mkVert f2 
+      (v3, n3) <- mkVert f3 
+      return (V.fromList [v1, v2, v3], V.fromList [n1, n2, n3])
+    mkFace _ = Left "Converter support only triangles, triangulate your OBJ file"
+    
+    mkVert :: FaceIndex -> Either String (V3 Float, V3 Float)
+    mkVert FaceIndex{..} = case faceNorIndex of 
+      Nothing -> Left "OBJ model must have normals for each vertex"
+      Just ni -> case objLocations V.!? faceLocIndex of 
+        Nothing -> Left $ "Cannot find vertex with id " ++ show faceLocIndex 
+        Just (Location lx ly lz _) -> case objNormals V.!? ni of
+          Nothing -> Left $ "Cannot find normal with id " ++ show ni 
+          Just (Normal nx ny nz) -> Right (V3 lx ly lz, V3 nx ny nz)
 
 gridMesh :: Float -> Mesh 
 gridMesh s = Mesh {
