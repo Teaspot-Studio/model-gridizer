@@ -23,6 +23,7 @@ import Core
 import Matrix
 import Loader
 import Camera 
+import Splitter
 
 import qualified Graphics.UI.GLFW as GLFW 
 
@@ -124,7 +125,7 @@ renderWire gridSize objMeshName storage = (<|> pure Nothing) $ proc _ -> do
   t <- timeF -< ()
   globalUniforms -< (aspect, t)
   cam <- camera storage -< ()
-  model storage objMeshName -< ()
+  model storage objMeshName gridSize -< ()
   grid storage gridSize -< cam
   glfwFinishFrame -< w
   returnA -< Just $ Game closed
@@ -154,12 +155,12 @@ renderWire gridSize objMeshName storage = (<|> pure Nothing) $ proc _ -> do
   glfwFinishFrame = liftGameMonad1 $ liftIO . GLFW.swapBuffers
 
 -- | Intializes and renders obj mesh
-model :: GLStorage -> FilePath -> AppWire a ()
-model storage objMeshName = withInit (const initModel) renderModel
+model :: GLStorage -> FilePath -> Float -> AppWire a ()
+model storage objMeshName gsize = withInit (const initModel) renderModel
   where
   initModel :: GameMonadT AppMonad Object
   initModel = liftIO $ do 
-    mmesh <- loadObjMesh objMeshName
+    mmesh <- loadObjMesh objMeshName gsize
     case mmesh of 
       Left er -> fail er 
       Right modelMesh -> do 
@@ -202,7 +203,7 @@ camera storage = stateWire initalCamera $ proc (_, c) -> do
     . keyCameraUpdate Key'D (\t -> cameraMoveRight (spd*t)) 
     . moveCameraUpdate -< c
   where
-    initalCamera = Camera (L.V3 0 1 0) (L.normalize $ L.V3 (-5) (-2) (-5)) (L.V3 5 2 5)
+    initalCamera = Camera (L.V3 0 1 0) (L.normalize $ L.V3 (1) (-1) (-1)) (L.V3 (-1) 1 1)
     spd = 0.5
 
     updUniforms = liftGameMonad1 $ \cam -> liftIO $ do
