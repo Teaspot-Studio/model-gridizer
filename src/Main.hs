@@ -12,6 +12,7 @@ import System.Environment
 import Text.Read
 
 import Control.Wire 
+import Control.Wire.Unsafe.Event
 import Prelude hiding ((.), id)
 
 import Game.GoreAndAsh
@@ -94,6 +95,7 @@ initWindow title width height = do
       ]
     Just win <- GLFW.createWindow width height title Nothing Nothing
     GLFW.makeContextCurrent $ Just win
+    liftIO $ GLFW.setCursorInputMode win GLFW.CursorInputMode'Disabled
     return win
 
 data Game = Game {
@@ -129,7 +131,9 @@ renderWire gridSize objMeshName storage = (<|> pure Nothing) $ proc _ -> do
   where
   -- | Outputs True if user hits close button
   isWindowClosed :: AppWire a Bool
-  isWindowClosed = hold . mapE (const True) . windowClosing <|> pure False
+  isWindowClosed = hold . mapE (const True) . windowClosing 
+    <|> hold . mapE (const True) . keyPressed Key'Escape
+    <|> pure False
 
   -- | Updates LambdaCube window size
   updateWinSize :: AppWire GLFW.Window Float
@@ -189,12 +193,32 @@ grid storage size = withInit (const initGrid) renderGrid
 
 -- | Camera control
 camera :: GLStorage -> AppWire a Camera
-camera storage = proc _ -> do 
-  updUniforms -< initalCamera
-  returnA -< initalCamera
+camera storage = stateWire initalCamera $ proc (_, c) -> do 
+  updUniforms -< c
+  returnA 
+    . keyCameraUpdate Key'W (\t -> cameraMoveForward (spd*t))
+    . keyCameraUpdate Key'S (\t -> cameraMoveForward (negate $ spd*t))
+    . keyCameraUpdate Key'A (\t -> cameraMoveLeft (spd*t))
+    . keyCameraUpdate Key'D (\t -> cameraMoveRight (spd*t)) 
+    . moveCameraUpdate -< c
   where
     initalCamera = Camera (L.V3 0 1 0) (L.normalize $ L.V3 (-5) (-2) (-5)) (L.V3 5 2 5)
+    spd = 0.5
 
     updUniforms = liftGameMonad1 $ \cam -> liftIO $ do
       LambdaCubeGL.updateUniforms storage $ do
         "viewMat" @= return (cameraMatrix cam)
+
+    keyCameraUpdate :: Key -> (Float -> Camera -> Camera) -> AppWire Camera Camera 
+    keyCameraUpdate k camFunc = proc c -> do 
+      e <- keyPressing k -< ()
+      t <- deltaTime -< ()
+      returnA -< event c (const $ camFunc t c) e
+
+    moveCameraUpdate :: AppWire Camera Camera 
+    moveCameraUpdate = proc c -> do 
+      e <- mouseDeltaChange -< ()
+      let rotSpd = 0.5 
+      returnA -< event c (\(dx, dy) -> 
+          cameraRotateYaw (rotSpd*(realToFrac dx)) 
+        . cameraRotatePitch (rotSpd*(realToFrac dy)) $ c) e 
