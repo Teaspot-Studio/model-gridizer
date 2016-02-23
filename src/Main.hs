@@ -160,7 +160,7 @@ model storage objMeshName gsize = withInit (const initModel) renderModel
   where
   initModel :: GameMonadT AppMonad Object
   initModel = liftIO $ do 
-    mmesh <- loadObjMesh objMeshName gsize
+    mmesh <- loadObjMesh objMeshName gsize -- return . Right $ debugMesh gsize --loadObjMesh objMeshName gsize
     case mmesh of 
       Left er -> fail er 
       Right modelMesh -> do 

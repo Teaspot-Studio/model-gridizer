@@ -21,6 +21,8 @@ executable model-gridizer
                        Loader
                        Camera
                        Splitter
+                       Triangulate
+                       Plane
 
   build-depends:       base >= 4.7 && < 5
                      , containers >= 0.5.6.2
@@ -41,7 +43,9 @@ executable model-gridizer
                      , unordered-containers >= 0.2.5.1
                      , vector >= 0.11.0.0
                      , wavefront >= 0.7
-
+                     , delaunay >= 0.1.0.2
+                     , AC-Vector >= 2.3.2
+                     
   default-extensions: 
                       Arrows
                       BangPatterns
@@ -55,4 +59,4 @@ executable model-gridizer
                       TypeFamilies
                       UndecidableInstances
 
-  ghc-options: -threaded
+  ghc-options: -threaded -rtsopts
