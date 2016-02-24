@@ -10,10 +10,12 @@ import qualified Data.Vector as V
 import Data.Vector (Vector)
 
 import Plane 
+import Debug.Trace as Db
 
 triangulate :: Vector (V3 Float) -> Vector (V3 Float, V3 Float, V3 Float)
 triangulate vs 
   | V.length vs < 3 = V.empty
+  | colinearAll vs = Db.trace "colinear" V.empty
   | otherwise = 
       fmap (\(v1, v2, v3) -> (fromV2 v1, fromV2 v2, fromV2 v3)) 
     . V.fromList . D.triangulate $ v2s

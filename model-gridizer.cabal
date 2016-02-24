@@ -45,7 +45,7 @@ executable model-gridizer
                      , wavefront >= 0.7
                      , delaunay >= 0.1.0.2
                      , AC-Vector >= 2.3.2
-                     
+
   default-extensions: 
                       Arrows
                       BangPatterns

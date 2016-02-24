@@ -10,6 +10,8 @@ import Data.Monoid
 import Data.List (sortBy, nubBy)
 import Data.Ord (comparing)
 
+import Debug.Trace
+
 v3 :: a -> V3 a 
 v3 a = V3 a a a 
 
@@ -50,6 +52,14 @@ planeFromPoints v1 v2 v3 = Plane v1 n t
 planePoint :: Plane -> V2 Float -> V3 Float 
 planePoint p (V2 x y) = planeOrigin p + fmap (x *) (planeTangent p) + fmap (y *) (planeBitangent p)
 
+-- | Calculate distance from point to nearest point of plane
+distanceToPlane :: Plane -> V3 Float -> Float 
+distanceToPlane Plane{..} v = norm $ project planeNormal (v - planeOrigin)
+
+-- | Test if point belongs to the plane
+pointInPlane :: V3 Float -> Plane -> Bool 
+pointInPlane v p = distanceToPlane p v < 0.0001
+
 data CubeSide = CubeLeft | CubeRight | CubeFront | CubeBack | CubeBottom | CubeTop 
   deriving (Eq, Show)
 
@@ -82,6 +92,12 @@ data Line = Line {
 linePoint :: Line -> Float -> V3 Float 
 linePoint Line{..} a = lineOrigin + fmap (a *) lineTangent
 
+-- | Check if given line is completly belongs to plane
+lineInPlane :: Line -> Plane -> Bool 
+lineInPlane l@Line{..} p@Plane{..} = (lineOrigin `pointInPlane` p) && cosAngle < 0.001
+  where
+    cosAngle = abs $ planeNormal `dot` lineTangent
+
 -- | Return all edges of cube with given origin and size
 gridEdges :: V3 Float -> Float -> Vector Line 
 gridEdges o d = V.fromList [
@@ -103,9 +119,9 @@ gridEdges o d = V.fromList [
 gridCut :: Plane -> V3 Float -> Float -> Vector (V3 Float)
 gridCut plane o d = catMaybes $ intersect <$> gridEdges o d
   where 
-    intersect l = let 
+    intersect l = if l `lineInPlane` plane then Nothing else let 
       (a, _, _) = lineCrossPlane l plane
-      in if a > 0 && a < d then Just (linePoint l a) else Nothing 
+      in if a >= 0 && a <= d then Just (linePoint l a) else Nothing 
 
 -- | Project 3D point into plane
 planeProject :: Plane -> V3 Float -> V2 Float 
@@ -183,8 +199,23 @@ lineCrossPlaneRestrict l lineLength p planeLength = let
 lineCrossBoxRestrict :: Line -> Float -> V3 Float -> Float -> Maybe (V3 Float, CubeSide)
 lineCrossBoxRestrict l lineLength boxOrigin boxSize = let
   tries = try <$> cubePlanes boxOrigin boxSize
-  try (p, s) = case lineCrossPlaneRestrict l lineLength p boxSize of 
-    Nothing -> Nothing
-    Just v -> Just (v, s)
+  try (p, s) = if l `lineInPlane` p then traceShow "!!!!" Nothing
+    else case lineCrossPlaneRestrict l lineLength p boxSize of 
+      Nothing -> Nothing
+      Just v -> Just (v, s)
   succs = catMaybes tries 
   in succs V.!? 0
+
+-- | Returns True if all points lies on single line
+colinear :: V3 Float -> V3 Float -> V3 Float -> Bool
+colinear a b c = let s = norm ((b - a) `cross` (c - a)) in s < 0.00001
+
+-- | Test if all vectors in the vector are not forming triangles
+colinearAll :: Vector (V3 Float) -> Bool
+colinearAll vs 
+  | V.length vs < 3 = False 
+  | otherwise = go (V.unsafeIndex vs 0) (V.unsafeIndex vs 1) (V.unsafeIndex vs 2) (V.drop 3 vs)
+  where
+    go a b c vs' 
+      | V.length vs' == 0 = colinear a b c
+      | otherwise = if colinear a b c then True else go b c (V.unsafeIndex vs' 0) (V.unsafeTail vs')

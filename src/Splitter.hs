@@ -46,10 +46,14 @@ splitLine :: V3 Float -- ^ First point
   -> HashMap (V3 Int) (Vector (V3 Float)) -- ^ Separated points, points are duplicated at edges for each box
 splitLine v1 v2 gsize = go H.empty (toGridOrigin v1 gsize) v1
   where
+
   go :: HashMap (V3 Int) (Vector (V3 Float)) -> V3 Int -> V3 Float -> HashMap (V3 Int) (Vector (V3 Float))
   go acc i v = case lineCrossGrid v v2 gsize of 
     Nothing -> append i v2 . append i v $ acc 
-    Just (v', _) -> go (append i v' . append i v $ acc) (toGridOrigin (v' + dv) gsize) (v' + dv)
+    Just (v', _) -> let
+      origin = toGridOrigin (v' + dv) gsize
+      acc' = append i v' . append i v $ acc
+      in go acc' origin (v' + dv)
     where 
     dv = fmap (0.00001*) . normalize $ v2 - v
 
@@ -69,14 +73,18 @@ splitTriangle ::
   -> V3 Float -- ^ Third point
   -> Float -- ^ Grid size
   -> HashMap (V3 Int) (Vector (V3 Float, V3 Float, V3 Float)) -- ^ Triangles by grid boxes
-splitTriangle v1 v2 v3 gsize = fmap triangulate . H.mapWithKey addCut $ 
-  splitLine v1 v2 gsize `merge` splitLine v2 v3 gsize `merge` splitLine v3 v1 gsize
+splitTriangle v1 v2 v3 gsize = fmap (traceShowId . triangulate . traceShowId) . H.mapWithKey addCut $ 
+  traceShow ("v1 v2", splitLine v1 v2 gsize ) splitLine v1 v2 gsize 
+  `merge` 
+  traceShow ("v2 v3", splitLine v2 v3 gsize )splitLine v2 v3 gsize 
+  `merge` 
+  traceShow ("v3 v1", splitLine v3 v1 gsize ) splitLine v3 v1 gsize
   where
   merge = H.unionWith (<>)
 
   addCut :: V3 Int -> Vector (V3 Float) -> Vector (V3 Float)
-  addCut i vs = nubVecs $ vs <> (triangleCut v1 v2 v3 ((* gsize) . fromIntegral <$> i) gsize)
-
+  addCut i vs = nubVecs $ vs <> traceShow ("cuts", cuts) cuts
+    where cuts = triangleCut v1 v2 v3 ((* gsize) . fromIntegral <$> i) gsize
 -- | Simplified version without boxing to grid cells
 splitTriangle' :: 
      V3 Float -- ^ First point
@@ -104,16 +112,19 @@ debugMesh gsize = LC.Mesh {
     ns = repeat $ V3 0 1 0.0
 
 splitMesh :: Float -> WavefrontOBJ -> WavefrontOBJ
-splitMesh gsize w@WavefrontOBJ{..} = w { 
-    objFaces = faces
+splitMesh gsize w@WavefrontOBJ{..} = traceShow test $ w { 
+    objFaces = traceShow ("faces", V.length faces) faces
   , objLocations = locs
   , objNormals = normals 
   , objTexCoords = uvs
   }
   where
+  testPlane = planeFromPoints (V3 0 0 0) (V3 0 0 1) (V3 1 0 1)
+  testLine = lineFromPoints (V3 0 0 0) (V3 1 0.0 0)
+  test = pointInPlane (V3 0 0 0) testPlane
   (faces, locs, uvs, normals) = V.foldl' merge (V.empty, V.empty, V.empty, V.empty) $ splitFace <$> objFaces
 
-  merge (afs, als, auvs, ans) (fs, ls, uvs, ns) = (shiftIndecies <$> fs, als <> ls, auvs <> uvs, ans <> ns)
+  merge (afs, als, auvs, ans) (fs, ls, uvs, ns) = (afs <> fmap shiftIndecies fs, als <> ls, auvs <> uvs, ans <> ns)
     where 
     shiftIndecies e = e { elValue = shiftIndecies' $ elValue e}
     shiftIndecies' (Face i1 i2 i3 is) = Face (shiftIndex i1) (shiftIndex i2) (shiftIndex i3) (shiftIndex <$> is)
