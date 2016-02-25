@@ -8,28 +8,28 @@ import Control.Monad (join)
 import Control.Monad.IO.Class
 import qualified Data.Map as Map
 import qualified Data.Vector as V
-import qualified Data.Foldable as F 
-import Data.Monoid 
+import qualified Data.Foldable as F
+import Data.Monoid
 
 import Codec.Wavefront
 import LambdaCube.GL as LambdaCubeGL -- renderer
 import LambdaCube.GL.Mesh as LambdaCubeGL
 
-import Splitter 
+import Splitter
 
 loadObjMesh :: MonadIO m => FilePath -> Float -> m (Either String Mesh)
-loadObjMesh objFile gsize = do 
+loadObjMesh objFile gsize = do
   eobj <- fromFile objFile
   return . join $ parseObjMesh . splitMesh gsize <$> eobj
 
 type VecNormAccum = (V.Vector (V3 Float), V.Vector (V3 Float))
 
-parseObjMesh :: WavefrontOBJ -> Either String Mesh 
-parseObjMesh WavefrontOBJ{..} = mkMesh <$> F.foldlM accumFaces (V.empty, V.empty) objFaces 
+parseObjMesh :: WavefrontOBJ -> Either String Mesh
+parseObjMesh WavefrontOBJ{..} = mkMesh <$> F.foldlM accumFaces (V.empty, V.empty) objFaces
   where
     mkMesh :: VecNormAccum -> Mesh
     mkMesh (vs, ns) = Mesh {
-      mAttributes = Map.fromList 
+      mAttributes = Map.fromList
         [ ("position", A_V3F $ V.reverse vs)
         , ("normal",   A_V3F $ V.reverse ns)
         ]
@@ -39,30 +39,30 @@ parseObjMesh WavefrontOBJ{..} = mkMesh <$> F.foldlM accumFaces (V.empty, V.empty
     accumFaces :: VecNormAccum -> Element Face -> Either String VecNormAccum
     accumFaces (vs, ns) f = do
       (vs', ns') <- mkFace . elValue $ f
-      return $ (vs <> vs', ns <> ns')
+      return (vs <> vs', ns <> ns')
 
     mkFace :: Face -> Either String (V.Vector (V3 Float), V.Vector (V3 Float))
     mkFace (Triangle f1 f2 f3) = do
-      (v1, n1) <- mkVert f1 
-      (v2, n2) <- mkVert f2 
-      (v3, n3) <- mkVert f3 
+      (v1, n1) <- mkVert f1
+      (v2, n2) <- mkVert f2
+      (v3, n3) <- mkVert f3
       return (V.fromList [v1, v2, v3], V.fromList [n1, n2, n3])
     mkFace _ = Left "Converter support only triangles, triangulate your OBJ file"
 
     mkVert :: FaceIndex -> Either String (V3 Float, V3 Float)
-    mkVert FaceIndex{..} = case faceNorIndex of 
+    mkVert FaceIndex{..} = case faceNorIndex of
       Nothing -> Left "OBJ model must have normals for each vertex"
-      Just ni -> case objLocations V.!? (faceLocIndex - 1) of 
-        Nothing -> Left $ "Cannot find vertex with id " ++ show faceLocIndex 
+      Just ni -> case objLocations V.!? (faceLocIndex - 1) of
+        Nothing -> Left $ "Cannot find vertex with id " ++ show faceLocIndex
         Just (Location lx ly lz _) -> case objNormals V.!? (ni - 1) of
-          Nothing -> Left $ "Cannot find normal with id " ++ show ni 
+          Nothing -> Left $ "Cannot find normal with id " ++ show ni
           Just (Normal nx ny nz) -> Right (V3 lx ly lz, V3 nx ny nz)
 
-gridMesh :: Float -> Mesh 
+gridMesh :: Float -> Mesh
 gridMesh s = Mesh {
-    mAttributes = Map.fromList 
-      [ ("position", A_V3F $ vertecies)
-      , ("normal",   A_V3F $ normals)
+    mAttributes = Map.fromList
+      [ ("position", A_V3F vertecies)
+      , ("normal",   A_V3F normals)
       ]
   , mPrimitive = P_Triangles
   }
@@ -93,7 +93,7 @@ cubeMesh = Mesh
       ]
   , mPrimitive    = P_Triangles
   }
-  where 
+  where
   vertecies = [
       v3, v2, v1, v3, v1, v0
     , v4, v7, v6, v4, v6, v5
@@ -121,8 +121,8 @@ cubeMesh = Mesh
   v7 = V3 (-1)   1    1
 
   n0 = V3   0    0  (-1)
-  n1 = V3   0    0    1 
+  n1 = V3   0    0    1
   n2 = V3 (-1)   0    0
-  n3 = V3   1    0    0 
+  n3 = V3   1    0    0
   n4 = V3   0    1    0
   n5 = V3   0  (-1)   0
