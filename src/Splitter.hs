@@ -3,16 +3,17 @@ module Splitter(
   , debugMesh
   ) where
 
-import Linear
 import Codec.Wavefront hiding (Line)
-import Data.Vector (Vector)
+import Control.DeepSeq
 import Data.HashMap.Strict (HashMap)
-import qualified Data.Vector as V
-import qualified Data.HashMap.Strict as H
+import Data.List (sortBy, nubBy)
 import Data.Maybe (isJust, fromJust)
 import Data.Monoid
-import Data.List (sortBy, nubBy)
 import Data.Ord (comparing)
+import Data.Vector (Vector)
+import Linear
+import qualified Data.HashMap.Strict as H
+import qualified Data.Vector as V
 
 import Debug.Trace
 import qualified LambdaCube.GL as LC
@@ -21,6 +22,17 @@ import qualified Data.Map as Map
 
 import Plane
 import Triangulate
+
+uncurry3 :: (a -> b -> c -> d) -> (a, b, c) -> d
+uncurry3 f (a, b, c) = f a b c
+
+-- | Test if given triple of points form conter clockwise triangle
+isCCW :: V3 Float -- ^ Original normal
+  -> V3 Float -- ^ First point
+  -> V3 Float -- ^ Second point
+  -> V3 Float -- ^ Third point
+  -> Bool -- ^ True if conter clockwise order
+isCCW n v1 v2 v3 = (((v2 - v1) `cross` (v3 - v1)) `dot` n) >= 0
 
 -- | Detect cross for line and grid
 lineCrossGrid ::
@@ -73,14 +85,16 @@ splitTriangle ::
   -> V3 Float -- ^ Third point
   -> Float -- ^ Grid size
   -> HashMap (V3 Int) (Vector (V3 Float, V3 Float, V3 Float)) -- ^ Triangles by grid boxes
-splitTriangle v1 v2 v3 gsize = fmap (traceShowId . triangulate . traceShowId) . H.mapWithKey addCut $
-  traceShow ("v1 v2", splitLine v1 v2 gsize ) splitLine v1 v2 gsize
-  `merge`
-  traceShow ("v2 v3", splitLine v2 v3 gsize )splitLine v2 v3 gsize
-  `merge`
-  traceShow ("v3 v1", splitLine v3 v1 gsize ) splitLine v3 v1 gsize
+splitTriangle v1 v2 v3 gsize =
+  fmap (V.filter (uncurry3 $ isCCW normal) . triangulate) . H.mapWithKey addCut $
+    traceShow ("v1 v2", splitLine v1 v2 gsize ) splitLine v1 v2 gsize
+    `merge`
+    traceShow ("v2 v3", splitLine v2 v3 gsize )splitLine v2 v3 gsize
+    `merge`
+    traceShow ("v3 v1", splitLine v3 v1 gsize ) splitLine v3 v1 gsize
   where
   merge = H.unionWith (<>)
+  normal = (v2 - v1) `cross` (v3 - v1)
 
   addCut :: V3 Int -> Vector (V3 Float) -> Vector (V3 Float)
   addCut i vs = nubVecs $ vs <> traceShow ("cuts", cuts) cuts
@@ -135,7 +149,7 @@ splitMesh gsize w@WavefrontOBJ{..} = traceShow test $ w {
       }
 
   splitFace :: Element Face -> (Vector (Element Face), Vector Location, Vector TexCoord, Vector Normal)
-  splitFace ef = faces
+  splitFace ef = faces `deepseq` faces
     where
     indexVertex FaceIndex{..} = case objLocations V.!? (faceLocIndex - 1) of
       Nothing -> error $ "Cannot find vertex with id " ++ show faceLocIndex
@@ -190,3 +204,29 @@ splitMesh gsize w@WavefrontOBJ{..} = traceShow test $ w {
 
     mkNormal :: V3 Float -> Normal
     mkNormal (V3 x y z) = Normal x y z
+
+instance NFData TexCoord where
+  rnf (TexCoord t u w) = t `seq` u `seq` w `seq` ()
+
+instance NFData Location where
+  rnf (Location x y z w) = x `seq` y `seq` z `seq` w `seq` ()
+
+instance NFData Normal where
+  rnf (Normal x y z) = x `seq` y `seq` z `seq` ()
+
+instance NFData a => NFData (Element a) where
+  rnf Element{..} = elObject
+    `deepseq` elGroups
+    `deepseq` elMtl
+    `deepseq` elSmoothingGroup
+    `deepseq` elValue
+    `deepseq` ()
+
+instance NFData Face where
+  rnf (Face a b c ds) = a `deepseq` b `deepseq` c `deepseq` ds `deepseq` ()
+
+instance NFData FaceIndex where
+  rnf FaceIndex{..} = faceLocIndex
+    `deepseq` faceTexCoordIndex
+    `deepseq` faceNorIndex
+    `deepseq` ()
