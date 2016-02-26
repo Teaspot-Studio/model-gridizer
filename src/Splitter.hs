@@ -44,28 +44,42 @@ lineCrossGrid lbeg lend gsize = lineCrossBoxRestrict l ll gridOrigin gsize
   where
     l = lineFromPoints lbeg lend
     ll = norm $ lend - lbeg
-    gridOrigin = (gsize *) . fromIntegral <$> toGridOrigin lbeg gsize
+    gridOrigin = (gsize *) . fromIntegral <$> toGridOrigin lbeg (lend - lbeg) gsize
 
 toGridOrigin :: V3 Float -- ^ Point
+  -> V3 Float -- ^ Direction
   -> Float -- ^ Grid size
   -> V3 Int -- ^ Origin of grid cube that contains the point
-toGridOrigin v gsize = fmap (floor . (/ gsize)) v
+toGridOrigin v@(V3 x y z) (V3 dx dy dz) gsize = V3 xi' yi' zi'
+  where
+    V3 xi yi zi = fmap (floor . (/ gsize)) v
+    xi' | x - gsize * fromIntegral xi == 0.0 = if dx > 0 then xi else xi - 1
+        | x - gsize * fromIntegral xi == 1.0 = if dx > 0 then xi + 1 else xi
+        | otherwise = xi
+
+    yi' | y - gsize * fromIntegral yi == 0.0 = if dy > 0 then yi else yi - 1
+        | y - gsize * fromIntegral yi == 1.0 = if dy > 0 then yi + 1 else yi
+        | otherwise = yi
+
+    zi' | z - gsize * fromIntegral zi == 0.0 = if dz > 0 then zi else zi - 1
+        | z - gsize * fromIntegral zi == 1.0 = if dz > 0 then zi + 1 else zi
+        | otherwise = zi
 
 -- | Split line into parts by grid
 splitLine :: V3 Float -- ^ First point
   -> V3 Float -- ^ Second point
   -> Float -- ^ Grid size
   -> HashMap (V3 Int) (Vector (V3 Float)) -- ^ Separated points, points are duplicated at edges for each box
-splitLine v1 v2 gsize = go H.empty (toGridOrigin v1 gsize) v1
+splitLine v1 v2 gsize = go H.empty (toGridOrigin v1 (v2 - v1) gsize) v1
   where
 
   go :: HashMap (V3 Int) (Vector (V3 Float)) -> V3 Int -> V3 Float -> HashMap (V3 Int) (Vector (V3 Float))
   go acc i v = case lineCrossGrid v v2 gsize of
     Nothing -> append i v2 . append i v $ acc
     Just (v', _) -> let
-      origin = toGridOrigin (v' + dv) gsize
+      origin = toGridOrigin v' dv gsize
       acc' = append i v' . append i v $ acc
-      in go acc' origin (v' + dv)
+      in go acc' origin v'
     where
     dv = fmap (0.00001*) . normalize $ v2 - v
 
