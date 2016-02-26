@@ -53,16 +53,13 @@ toGridOrigin :: V3 Float -- ^ Point
 toGridOrigin v@(V3 x y z) (V3 dx dy dz) gsize = V3 xi' yi' zi'
   where
     V3 xi yi zi = fmap (floor . (/ gsize)) v
-    xi' | x - gsize * fromIntegral xi == 0.0 = if dx > 0 then xi else xi - 1
-        | x - gsize * fromIntegral xi == 1.0 = if dx > 0 then xi + 1 else xi
+    xi' | (x - gsize * fromIntegral xi) `approxEq` 0.0 = if dx >= 0 then xi else xi - 1
         | otherwise = xi
 
-    yi' | y - gsize * fromIntegral yi == 0.0 = if dy > 0 then yi else yi - 1
-        | y - gsize * fromIntegral yi == 1.0 = if dy > 0 then yi + 1 else yi
+    yi' | (y - gsize * fromIntegral yi) `approxEq` 0.0 = if dy >= 0 then yi else yi - 1
         | otherwise = yi
 
-    zi' | z - gsize * fromIntegral zi == 0.0 = if dz > 0 then zi else zi - 1
-        | z - gsize * fromIntegral zi == 1.0 = if dz > 0 then zi + 1 else zi
+    zi' | (z - gsize * fromIntegral zi) `approxEq` 0.0 = if dz >= 0 then zi else zi - 1
         | otherwise = zi
 
 -- | Split line into parts by grid
@@ -103,7 +100,7 @@ splitTriangle v1 v2 v3 gsize =
   fmap (V.filter (uncurry3 $ isCCW normal) . triangulate) . H.mapWithKey addCut $
     traceShow ("v1 v2", splitLine v1 v2 gsize ) splitLine v1 v2 gsize
     `merge`
-    traceShow ("v2 v3", splitLine v2 v3 gsize )splitLine v2 v3 gsize
+    traceShow ("v2 v3", splitLine v2 v3 gsize ) splitLine v2 v3 gsize
     `merge`
     traceShow ("v3 v1", splitLine v3 v1 gsize ) splitLine v3 v1 gsize
   where

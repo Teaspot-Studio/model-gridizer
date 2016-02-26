@@ -15,8 +15,14 @@ import Debug.Trace
 v3 :: a -> V3 a
 v3 a = V3 a a a
 
-approxEq :: V3 Float -> V3 Float -> Bool
-approxEq v1 v2 = norm (v2 - v1) < 0.000001
+class ApproxEq a where
+  approxEq :: a -> a -> Bool
+
+instance ApproxEq (V3 Float) where
+  approxEq v1 v2 = norm (v2 - v1) < 0.000001
+
+instance ApproxEq Float where
+  approxEq v1 v2 = abs (v2 - v1) < 0.000001
 
 nubVecs :: Vector (V3 Float) -> Vector (V3 Float)
 nubVecs = V.fromList . nubBy approxEq . V.toList
@@ -213,7 +219,7 @@ colinear a b c = let s = norm ((b - a) `cross` (c - a)) in s < 0.00001
 -- | Test if all vectors in the vector are not forming triangles
 colinearAll :: Vector (V3 Float) -> Bool
 colinearAll vs
-  | V.length vs < 3 = False 
+  | V.length vs < 3 = False
   | otherwise = go (V.unsafeIndex vs 0) (V.unsafeIndex vs 1) (V.unsafeIndex vs 2) (V.drop 3 vs)
   where
     go a b c vs'
