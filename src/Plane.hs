@@ -165,9 +165,9 @@ isInTriangle2D :: V2 Float -- ^ First point
 isInTriangle2D v1 v2 v3 vt = (b1 == b2) && (b2 == b3)
   where
   signp (V2 p1x p1y) (V2 p2x p2y) (V2 p3x p3y) = (p1x - p3x) * (p2y - p3y) - (p2x - p3x) * (p1y - p3y)
-  b1 = signp vt v1 v2 <= 0
-  b2 = signp vt v2 v3 <= 0
-  b3 = signp vt v3 v1 <= 0
+  b1 = let val = signp vt v1 v2 in val < 0 || val `approxEq` 0
+  b2 = let val = signp vt v2 v3 in val < 0 || val `approxEq` 0
+  b3 = let val = signp vt v3 v1 in val < 0 || val `approxEq` 0
 
 isInTriangle :: V3 Float -- ^ First point
   -> V3 Float -- ^ Second point
@@ -213,7 +213,7 @@ lineCrossPlaneRestrict :: Line -> Float -> Plane -> Float -> Maybe (V3 Float)
 lineCrossPlaneRestrict l lineLength p planeLength = let
   a = lineCrossPlane l p
   V2 b c = planeProject p (linePoint l a)
-  in traceShow ("lineCrossPlaneRestrict", a, b, c) $ if a > 0 && a <= lineLength && b > 0 && b <= planeLength && c > 0 && c <= planeLength
+  in if a > 0 && a <= lineLength && b > 0 && b <= planeLength && c > 0 && c <= planeLength
         then Just $ lineOrigin l + fmap (a *) (lineTangent l)
         else Nothing
 
@@ -223,7 +223,7 @@ lineCrossBoxRestrict l lineLength boxOrigin boxSize = let
   tries = try <$> cubePlanes boxOrigin boxSize
   try (p, s) = if l `lineInPlane` p then Nothing
     else case lineCrossPlaneRestrict l lineLength p boxSize of
-      Nothing -> traceShow ("lineCrossBoxRestrict", s, boxOrigin) Nothing
+      Nothing -> Nothing
       Just v -> Just (v, s)
   succs = catMaybes tries
   in succs V.!? 0

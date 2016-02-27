@@ -74,11 +74,9 @@ splitLine v1 v2 gsize = go H.empty (toGridOrigin v1 (v2 - v1) gsize) v1
   go acc i v = case lineCrossGrid v v2 gsize of
     Nothing -> append i v2 . append i v $ acc
     Just (v', _) -> let
-      origin = toGridOrigin v' dv gsize
+      origin = toGridOrigin v' (v2 - v) gsize
       acc' = append i v' . append i v $ acc
       in go acc' origin v'
-    where
-    dv = fmap (0.00001*) . normalize $ v2 - v
 
   append :: V3 Int -> V3 Float -> HashMap (V3 Int) (Vector (V3 Float)) -> HashMap (V3 Int) (Vector (V3 Float))
   append k v m = case H.lookup k m of
@@ -96,7 +94,7 @@ splitTriangle ::
   -> V3 Float -- ^ Third point
   -> Float -- ^ Grid size
   -> HashMap (V3 Int) (Vector (V3 Float, V3 Float, V3 Float)) -- ^ Triangles by grid boxes
-splitTriangle v1 v2 v3 gsize =
+splitTriangle v1 v2 v3 gsize = traceShow ("test", test) $
   fmap (V.filter (uncurry3 $ isCCW normal) . triangulate) . H.mapWithKey addCut $
     traceShow ("v1 v2", splitLine v1 v2 gsize ) splitLine v1 v2 gsize
     `merge`
@@ -107,8 +105,9 @@ splitTriangle v1 v2 v3 gsize =
   merge = H.unionWith (<>)
   normal = (v2 - v1) `cross` (v3 - v1)
 
+  test = isInTriangle v1 v2 v3 (V3 1.0 0.1 0.0)
   addCut :: V3 Int -> Vector (V3 Float) -> Vector (V3 Float)
-  addCut i vs = nubVecs $ vs <> traceShow ("cuts", cuts) cuts
+  addCut i vs = nubVecs $ vs <> traceShow ("cuts", i, cuts) cuts
     where cuts = triangleCut v1 v2 v3 ((* gsize) . fromIntegral <$> i) gsize
 -- | Simplified version without boxing to grid cells
 splitTriangle' ::
@@ -137,16 +136,13 @@ debugMesh gsize = LC.Mesh {
     ns = repeat $ V3 0 1 0.0
 
 splitMesh :: Float -> WavefrontOBJ -> WavefrontOBJ
-splitMesh gsize w@WavefrontOBJ{..} = traceShow test $ w {
+splitMesh gsize w@WavefrontOBJ{..} = w {
     objFaces = traceShow ("faces", V.length faces) faces
   , objLocations = locs
   , objNormals = normals
   , objTexCoords = uvs
   }
   where
-  testPlane = planeFromPoints (V3 0 0 0) (V3 0 0 1) (V3 1 0 1)
-  testLine = lineFromPoints (V3 0 0 0) (V3 1 0.0 0)
-  test = pointInPlane (V3 0 0 0) testPlane
   (faces, locs, uvs, normals) = V.foldl' merge (V.empty, V.empty, V.empty, V.empty) $ splitFace <$> objFaces
 
   merge (afs, als, auvs, ans) (fs, ls, uvs, ns) = (afs <> fmap shiftIndecies fs, als <> ls, auvs <> uvs, ans <> ns)
