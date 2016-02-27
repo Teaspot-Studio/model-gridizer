@@ -14,8 +14,8 @@ import Data.Vector (Vector)
 import Linear
 import qualified Data.HashMap.Strict as H
 import qualified Data.Vector as V
+import qualified Data.Foldable as F
 
-import Debug.Trace
 import qualified LambdaCube.GL as LC
 import qualified LambdaCube.GL.Mesh as LC
 import qualified Data.Map as Map
@@ -85,6 +85,37 @@ splitLine v1 v2 gsize = go H.empty (toGridOrigin v1 (v2 - v1) gsize) v1
       Nothing -> H.insert k (vs `V.snoc` v) m
       Just _ -> m
 
+-- | Calculate minimal grid cell and maximum grid cell that are used for the triangle
+gridBoundingBox ::
+     V3 Float -- ^ First point
+  -> V3 Float -- ^ Second point
+  -> V3 Float -- ^ Third point
+  -> Float -- ^ Grid size
+  -> (V3 Int, V3 Int)
+gridBoundingBox (V3 x1 y1 z1) (V3 x2 y2 z2) (V3 x3 y3 z3) gsize =
+  (togrid $ V3 minx miny minz, togrid $ V3 maxx maxy maxz)
+  where
+    togrid :: V3 Float -> V3 Int
+    togrid = fmap (floor . (/ gsize))
+    minx = minimum [x1, x2, x3]
+    maxx = maximum [x1, x2, x3]
+    miny = minimum [y1, y2, y3]
+    maxy = maximum [y1, y2, y3]
+    minz = minimum [z1, z2, z3]
+    maxz = maximum [z1, z2, z3]
+
+-- | Calculate all grid cells that are used for the triangle
+gridBoundingBoxCells ::
+     V3 Float -- ^ First point
+  -> V3 Float -- ^ Second point
+  -> V3 Float -- ^ Third point
+  -> Float -- ^ Grid size
+  -> Vector (V3 Int)
+gridBoundingBoxCells v1 v2 v3 gsize =
+  F.foldl' (\accx x -> F.foldl' (\accy y -> F.foldl' (\accz z -> accz `V.snoc` V3 x y z) accy [minz .. maxz]) accx [miny .. maxy]) V.empty [minx .. maxx]
+  where
+  (V3 minx miny minz, V3 maxx maxy maxz) = gridBoundingBox v1 v2 v3 gsize
+
 -- | Splits triangle by grid to several triangles
 --
 -- Note: points should be passed in CCW order
@@ -94,21 +125,25 @@ splitTriangle ::
   -> V3 Float -- ^ Third point
   -> Float -- ^ Grid size
   -> HashMap (V3 Int) (Vector (V3 Float, V3 Float, V3 Float)) -- ^ Triangles by grid boxes
-splitTriangle v1 v2 v3 gsize = traceShow ("test", test) $
-  fmap (V.filter (uncurry3 $ isCCW normal) . triangulate) . H.mapWithKey addCut $
-    traceShow ("v1 v2", splitLine v1 v2 gsize ) splitLine v1 v2 gsize
-    `merge`
-    traceShow ("v2 v3", splitLine v2 v3 gsize ) splitLine v2 v3 gsize
-    `merge`
-    traceShow ("v3 v1", splitLine v3 v1 gsize ) splitLine v3 v1 gsize
+splitTriangle v1 v2 v3 gsize =
+  V.filter (uncurry3 $ isCCW normal) . triangulate <$> withCuts
   where
+  withCuts = H.mapWithKey addCut withoutGaps
+  withoutGaps = F.foldl' addCell merged $ gridBoundingBoxCells v1 v2 v3 gsize
+  merged = splitLine v1 v2 gsize `merge` splitLine v2 v3 gsize `merge` splitLine v3 v1 gsize
   merge = H.unionWith (<>)
   normal = (v2 - v1) `cross` (v3 - v1)
 
-  test = isInTriangle v1 v2 v3 (V3 1.0 0.1 0.0)
   addCut :: V3 Int -> Vector (V3 Float) -> Vector (V3 Float)
-  addCut i vs = nubVecs $ vs <> traceShow ("cuts", i, cuts) cuts
+  addCut i vs = nubVecs $ vs <> cuts
     where cuts = triangleCut v1 v2 v3 ((* gsize) . fromIntegral <$> i) gsize
+
+  -- Add cell if missing
+  addCell :: HashMap (V3 Int) (Vector a) -> V3 Int -> HashMap (V3 Int) (Vector a)
+  addCell acc i = case H.lookup i acc of
+    Nothing -> H.insert i V.empty acc
+    Just _ -> acc
+
 -- | Simplified version without boxing to grid cells
 splitTriangle' ::
      V3 Float -- ^ First point
@@ -137,7 +172,7 @@ debugMesh gsize = LC.Mesh {
 
 splitMesh :: Float -> WavefrontOBJ -> WavefrontOBJ
 splitMesh gsize w@WavefrontOBJ{..} = w {
-    objFaces = traceShow ("faces", V.length faces) faces
+    objFaces = faces
   , objLocations = locs
   , objNormals = normals
   , objTexCoords = uvs

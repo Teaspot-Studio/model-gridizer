@@ -10,8 +10,6 @@ import Data.Monoid
 import Data.List (sortBy, nubBy)
 import Data.Ord (comparing)
 
-import Debug.Trace
-
 v3 :: a -> V3 a
 v3 a = V3 a a a
 
@@ -73,7 +71,7 @@ data CubeSide = CubeLeft | CubeRight | CubeFront | CubeBack | CubeBottom | CubeT
 cubePlanes :: V3 Float -> Float -> Vector (Plane, CubeSide)
 cubePlanes o d = V.fromList [
     (Plane o (V3 1 0 0) (V3 0 0 1), CubeLeft)
-  , (Plane o (V3 0 0 1) (V3 1 0 0), CubeFront)
+  , (Plane o (V3 0 0 (-1)) (V3 1 0 0), CubeFront)
   , (Plane o (V3 0 1 0) (V3 1 0 0), CubeBottom)
   , (Plane (o + v3 d) (V3 (-1) 0 0) (V3 0 (-1) 0), CubeRight)
   , (Plane (o + v3 d) (V3 0 0 (-1)) (V3 (-1) 0 0), CubeBack)
@@ -236,8 +234,6 @@ colinear a b c = let s = norm ((b - a) `cross` (c - a)) in s < 0.00001
 colinearAll :: Vector (V3 Float) -> Bool
 colinearAll vs
   | V.length vs < 3 = False
-  | otherwise = go (V.unsafeIndex vs 0) (V.unsafeIndex vs 1) (V.unsafeIndex vs 2) (V.drop 3 vs)
+  | otherwise = muts
   where
-    go a b c vs'
-      | V.length vs' == 0 = colinear a b c
-      | otherwise = colinear a b c || go b c (V.unsafeIndex vs' 0) (V.unsafeTail vs')
+    muts = and $ V.concatMap (\a -> V.concatMap (\b -> fmap (colinear a b) . V.filter (\v -> (v /= a) && (v /= b)) $ vs ) . V.filter (/= a) $ vs) vs
