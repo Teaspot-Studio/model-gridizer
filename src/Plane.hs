@@ -73,7 +73,7 @@ data CubeSide = CubeLeft | CubeRight | CubeFront | CubeBack | CubeBottom | CubeT
 cubePlanes :: V3 Float -> Float -> Vector (Plane, CubeSide)
 cubePlanes o d = V.fromList [
     (Plane o (V3 1 0 0) (V3 0 0 1), CubeLeft)
-  , (Plane o (V3 0 0 1) (V3 0 1 0), CubeFront)
+  , (Plane o (V3 0 0 1) (V3 1 0 0), CubeFront)
   , (Plane o (V3 0 1 0) (V3 1 0 0), CubeBottom)
   , (Plane (o + v3 d) (V3 (-1) 0 0) (V3 0 (-1) 0), CubeRight)
   , (Plane (o + v3 d) (V3 0 0 (-1)) (V3 (-1) 0 0), CubeBack)
@@ -126,19 +126,36 @@ gridCut :: Plane -> V3 Float -> Float -> Vector (V3 Float)
 gridCut plane o d = catMaybes $ intersect <$> gridEdges o d
   where
     intersect l = if l `lineInPlane` plane then Nothing else let
-      (a, _, _) = lineCrossPlane l plane
+      a = lineCrossPlane l plane
       in if a >= 0 && a <= d then Just (linePoint l a) else Nothing
+
+-- -- | Project 3D point into plane
+-- planeProject :: Plane -> V3 Float -> V2 Float
+-- planeProject p@Plane{..} (V3 x y z) = V2 b c
+--   where
+--   V3 tx ty tz = planeTangent
+--   V3 btx bty btz = planeBitangent p
+--   V3 nx ny nz = planeNormal
+--   V3 p0x p0y p0z = planeOrigin
+--   b = (((-p0z+z)*ny+nz*(p0y-y))*btx+((p0z-z)*nx+nz*(x-p0x))*bty-((p0y-y)*nx+ny*(x-p0x))*btz)/((ny*tz-nz*ty)*btx+(-nx*tz+nz*tx)*bty+btz*(nx*ty-ny*tx))
+--   c = (((-p0z+z)*ty+tz*(p0y-y))*nx+((p0z-z)*tx+tz*(x-p0x))*ny-((p0y-y)*tx+ty*(x-p0x))*nz)/((-bty*tz+btz*ty)*nx+(btx*tz-btz*tx)*ny-nz*(btx*ty-bty*tx))
 
 -- | Project 3D point into plane
 planeProject :: Plane -> V3 Float -> V2 Float
-planeProject p@Plane{..} (V3 x y z) = V2 b c
+planeProject p@Plane{..} v = V2 b c
   where
-  V3 tx ty tz = planeTangent
-  V3 btx bty btz = planeBitangent p
-  V3 nx ny nz = planeNormal
-  V3 p0x p0y p0z = planeOrigin
-  b = negate $ (btx*ny*p0z-btx*ny*z-btx*nz*p0y+btx*nz*y-bty*nx*p0z+bty*nx*z+bty*nz*p0x-bty*nz*x+btz*nx*p0y-btz*nx*y-btz*ny*p0x+btz*ny*x)/(btx*ny*tz-btx*nz*ty-bty*nx*tz+bty*nz*tx+btz*nx*ty-btz*ny*tx)
-  c = (nx*p0y*tz-nx*p0z*ty+nx*ty*z-nx*tz*y-ny*p0x*tz+ny*p0z*tx-ny*tx*z+ny*tz*x+nz*p0x*ty-nz*p0y*tx+nz*tx*y-nz*ty*x)/(btx*ny*tz-btx*nz*ty-bty*nx*tz+bty*nz*tx+btz*nx*ty-btz*ny*tx)
+  t = planeTangent
+  bt = planeBitangent p
+  n = planeNormal
+  o = planeOrigin
+
+  dv = v - planeOrigin -- 3d vector from origin to point
+  dvn = project planeNormal dv -- Projection to normal
+  dvt = dv - dvn -- Tangent projection
+  bv = project planeTangent dvt -- Project on tangent plane vector
+  b = signum (bv `dot` planeTangent) * norm bv
+  cv = project (planeBitangent p) dvt -- Project on bitangent plane vector
+  c = signum (cv `dot` planeBitangent p) * norm cv
 
 isInTriangle2D :: V2 Float -- ^ First point
   -> V2 Float -- ^ Second point
@@ -181,23 +198,22 @@ lineFromPoints :: V3 Float -> V3 Float -> Line
 lineFromPoints lbegin lend = Line lbegin (normalize $ lend - lbegin)
 
 -- | Calclulate line and plane parameters for crossing point
-lineCrossPlane :: Line -> Plane -> (Float, Float, Float)
-lineCrossPlane Line{..} p@Plane{..} = (a, b, c)
+lineCrossPlane :: Line -> Plane -> Float
+lineCrossPlane Line{..} p@Plane{..} = a
   where
   V3 vlx vly vlz = lineOrigin
   V3 tlx tly tlz = lineTangent
   V3 vp0x vp0y vp0z = planeOrigin
   V3 tpx tpy tpz = planeTangent
   V3 btpx btpy btpz = planeBitangent p
-  a = (btpx*tpy*vlz-btpx*tpy*vp0z-btpx*tpz*vly+btpx*tpz*vp0y-btpy*tpx*vlz+btpy*tpx*vp0z+btpy*tpz*vlx-btpy*tpz*vp0x+btpz*tpx*vly-btpz*tpx*vp0y-btpz*tpy*vlx+btpz*tpy*vp0x)/(btpx*tly*tpz-btpx*tlz*tpy-btpy*tlx*tpz+btpy*tlz*tpx+btpz*tlx*tpy-btpz*tly*tpx)
-  b = (btpx*tly*vlz-btpx*tly*vp0z-btpx*tlz*vly+btpx*tlz*vp0y-btpy*tlx*vlz+btpy*tlx*vp0z+btpy*tlz*vlx-btpy*tlz*vp0x+btpz*tlx*vly-btpz*tlx*vp0y-btpz*tly*vlx+btpz*tly*vp0x)/(btpx*tly*tpz-btpx*tlz*tpy-btpy*tlx*tpz+btpy*tlz*tpx+btpz*tlx*tpy-btpz*tly*tpx)
-  c = (tlx*tpy*vlz-tlx*tpy*vp0z-tlx*tpz*vly+tlx*tpz*vp0y-tly*tpx*vlz+tly*tpx*vp0z+tly*tpz*vlx-tly*tpz*vp0x+tlz*tpx*vly-tlz*tpx*vp0y-tlz*tpy*vlx+tlz*tpy*vp0x)/(btpx*tly*tpz-btpx*tlz*tpy-btpy*tlx*tpz+btpy*tlz*tpx+btpz*tlx*tpy-btpz*tly*tpx)
+  a = (((vp0z-vlz)*tpy-tpz*(vp0y-vly))*btpx+((-vp0z+vlz)*tpx+tpz*(vp0x-vlx))*btpy-((-vp0y+vly)*tpx+tpy*(vp0x-vlx))*btpz)/((-tly*tpz+tlz*tpy)*btpx+(tlx*tpz-tlz*tpx)*btpy-btpz*(tlx*tpy-tly*tpx))
 
 -- | Cross line and plane with given restriction for tangent lengths
 lineCrossPlaneRestrict :: Line -> Float -> Plane -> Float -> Maybe (V3 Float)
 lineCrossPlaneRestrict l lineLength p planeLength = let
-  (a, b, c) = lineCrossPlane l p
-  in if a > 0 && a <= lineLength && b > 0 && b <= planeLength && c > 0 && c <= planeLength
+  a = lineCrossPlane l p
+  V2 b c = planeProject p (linePoint l a)
+  in traceShow ("lineCrossPlaneRestrict", a, b, c) $ if a > 0 && a <= lineLength && b > 0 && b <= planeLength && c > 0 && c <= planeLength
         then Just $ lineOrigin l + fmap (a *) (lineTangent l)
         else Nothing
 
@@ -205,9 +221,9 @@ lineCrossPlaneRestrict l lineLength p planeLength = let
 lineCrossBoxRestrict :: Line -> Float -> V3 Float -> Float -> Maybe (V3 Float, CubeSide)
 lineCrossBoxRestrict l lineLength boxOrigin boxSize = let
   tries = try <$> cubePlanes boxOrigin boxSize
-  try (p, s) = if l `lineInPlane` p then traceShow "!!!!" Nothing
+  try (p, s) = if l `lineInPlane` p then Nothing
     else case lineCrossPlaneRestrict l lineLength p boxSize of
-      Nothing -> Nothing
+      Nothing -> traceShow ("lineCrossBoxRestrict", s, boxOrigin) Nothing
       Just v -> Just (v, s)
   succs = catMaybes tries
   in succs V.!? 0
