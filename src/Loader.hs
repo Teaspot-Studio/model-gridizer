@@ -77,9 +77,9 @@ gridMesh s = Mesh {
   xlines z = V.foldl' (\acc y -> acc <> xline (fromIntegral z) (fromIntegral y)) V.empty (V.fromList [-n .. n])
   zlines = foldl2D n n $ \acc x y -> acc <> zline (fromIntegral x) (fromIntegral y)
 
-  yline z x = V.fromList [V3 (s*x) (-d) (s*z), V3 (s*x) d (s*z), V3 (s*x) d (s*z)]
-  xline z y = V.fromList [V3 (-d) (s*y) (s*z), V3 d (s*y) (s*z), V3 d (s*y) (s*z)]
-  zline x y = V.fromList [V3 (s*x) (s*y) (-d), V3 (s*x) (s*y) d, V3 (s*x) (s*y) d]
+  yline z x = V.fromList [V3 (s*x) (-d*s) (s*z), V3 (s*x) (d*s) (s*z), V3 (s*x) (d*s) (s*z)]
+  xline z y = V.fromList [V3 (-d*s) (s*y) (s*z), V3 (d*s) (s*y) (s*z), V3 (d*s) (s*y) (s*z)]
+  zline x y = V.fromList [V3 (s*x) (s*y) (-d*s), V3 (s*x) (s*y) (d*s), V3 (s*x) (s*y) (d*s)]
 
   foldl2D :: Int -> Int -> (V.Vector a -> Int -> Int -> V.Vector a) -> V.Vector a
   foldl2D nx ny f = V.foldl' (\accx x -> V.foldl' (\accy y -> f accy x y) accx (V.fromList [-ny .. ny])) V.empty (V.fromList [-nx .. nx])
