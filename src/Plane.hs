@@ -10,6 +10,8 @@ import Data.Monoid
 import Data.List (sortBy, nubBy)
 import Data.Ord (comparing)
 
+import Debug.Trace
+
 v3 :: a -> V3 a
 v3 a = V3 a a a
 
@@ -125,18 +127,7 @@ gridCut plane o d = catMaybes $ intersect <$> gridEdges o d
   where
     intersect l = if l `lineInPlane` plane then Nothing else let
       a = lineCrossPlane l plane
-      in if a >= 0 && a <= d then Just (linePoint l a) else Nothing
-
--- -- | Project 3D point into plane
--- planeProject :: Plane -> V3 Float -> V2 Float
--- planeProject p@Plane{..} (V3 x y z) = V2 b c
---   where
---   V3 tx ty tz = planeTangent
---   V3 btx bty btz = planeBitangent p
---   V3 nx ny nz = planeNormal
---   V3 p0x p0y p0z = planeOrigin
---   b = (((-p0z+z)*ny+nz*(p0y-y))*btx+((p0z-z)*nx+nz*(x-p0x))*bty-((p0y-y)*nx+ny*(x-p0x))*btz)/((ny*tz-nz*ty)*btx+(-nx*tz+nz*tx)*bty+btz*(nx*ty-ny*tx))
---   c = (((-p0z+z)*ty+tz*(p0y-y))*nx+((p0z-z)*tx+tz*(x-p0x))*ny-((p0y-y)*tx+ty*(x-p0x))*nz)/((-bty*tz+btz*ty)*nx+(btx*tz-btz*tx)*ny-nz*(btx*ty-bty*tx))
+      in if (a > 0 || a `approxEq` 0) && (a < d || a `approxEq` d) then Just (linePoint l a) else Nothing
 
 -- | Project 3D point into plane
 planeProject :: Plane -> V3 Float -> V2 Float
@@ -211,7 +202,7 @@ lineCrossPlaneRestrict :: Line -> Float -> Plane -> Float -> Maybe (V3 Float)
 lineCrossPlaneRestrict l lineLength p planeLength = let
   a = lineCrossPlane l p
   V2 b c = planeProject p (linePoint l a)
-  in if a > 0 && a <= lineLength && b > 0 && b <= planeLength && c > 0 && c <= planeLength
+  in if a > 0 && a <= lineLength && b >= 0 && b <= planeLength && c >= 0 && c <= planeLength
         then Just $ lineOrigin l + fmap (a *) (lineTangent l)
         else Nothing
 
@@ -228,7 +219,7 @@ lineCrossBoxRestrict l lineLength boxOrigin boxSize = let
 
 -- | Returns True if all points lies on single line
 colinear :: V3 Float -> V3 Float -> V3 Float -> Bool
-colinear a b c = let s = norm ((b - a) `cross` (c - a)) in s < 0.00001
+colinear a b c = let s = norm ((b - a) `cross` (c - a)) in s < 0.000001
 
 -- | Test if all vectors in the vector are not forming triangles
 colinearAll :: Vector (V3 Float) -> Bool

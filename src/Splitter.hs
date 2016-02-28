@@ -23,6 +23,8 @@ import qualified Data.Map as Map
 import Plane
 import Triangulate
 
+import Debug.Trace
+
 uncurry3 :: (a -> b -> c -> d) -> (a, b, c) -> d
 uncurry3 f (a, b, c) = f a b c
 
@@ -130,7 +132,10 @@ splitTriangle v1 v2 v3 gsize =
   where
   withCuts = H.mapWithKey addCut withoutGaps
   withoutGaps = F.foldl' addCell merged $ gridBoundingBoxCells v1 v2 v3 gsize
-  merged = splitLine v1 v2 gsize `merge` splitLine v2 v3 gsize `merge` splitLine v3 v1 gsize
+  merged = v1v2 `merge` v2v3 `merge` v3v1
+  v1v2 = {- traceShow ("v1 v2", splitLine v1 v2 gsize) $ -} splitLine v1 v2 gsize
+  v2v3 = {- traceShow ("v2 v3", splitLine v2 v3 gsize) $ -} splitLine v2 v3 gsize
+  v3v1 = {- traceShow ("v3 v1", splitLine v3 v1 gsize) $ -} splitLine v3 v1 gsize
   merge = H.unionWith (<>)
   normal = (v2 - v1) `cross` (v3 - v1)
 
@@ -178,7 +183,7 @@ splitMesh gsize w@WavefrontOBJ{..} = w {
   , objTexCoords = uvs
   }
   where
-  (faces, locs, uvs, normals) = V.foldl' merge (V.empty, V.empty, V.empty, V.empty) $ splitFace <$> objFaces
+  (faces, locs, uvs, normals) = V.foldl' (\acc f -> acc `deepseq` merge acc f) (V.empty, V.empty, V.empty, V.empty) $ splitFace <$> objFaces
 
   merge (afs, als, auvs, ans) (fs, ls, uvs, ns) = (afs <> fmap shiftIndecies fs, als <> ls, auvs <> uvs, ans <> ns)
     where

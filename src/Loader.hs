@@ -20,7 +20,7 @@ import Splitter
 loadObjMesh :: MonadIO m => FilePath -> Float -> m (Either String Mesh)
 loadObjMesh objFile gsize = do
   eobj <- fromFile objFile
-  return . join $ parseObjMesh . splitMesh gsize <$> eobj
+  return . join $ parseObjMesh {- . splitMesh gsize-} <$> eobj
 
 type VecNormAccum = (V.Vector (V3 Float), V.Vector (V3 Float))
 
